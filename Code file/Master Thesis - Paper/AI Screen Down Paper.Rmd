@@ -1,0 +1,2879 @@
+---
+title: "Applying machine learning in Screening for Down Syndrome in Both Trimesters for Diverse Healthcare Scenarios"
+author:
+  - name: Huy D. Do
+    email: huydd1905@gmail.com
+    institute: [hmu]
+    correspondence: true
+  - name: Jeroan J. Allison
+    institute: [umass]
+  - name: Hoa L. Nguyen
+    institute: [umass]
+  - name: Cuong D. Tran
+    institute: [pstw]
+  - name: Giang M. Le
+    institute: [hmu]
+  - name: Trang T. Nguyen
+    institute: [hmu]
+institute:
+  - hmu: Hanoi Medical University, Hanoi, Vietnam
+  - umass: UMass Chan Medical School, Worcerster, MA, USA
+  - pstw: National Hospital of Obstetrics and Gynecology, Hanoi, Vietnam
+output:
+  pdf_document:
+    
+    number_sections: TRUE
+    
+    fig_caption: yes
+    
+    latex_engine: xelatex
+
+    pandoc_args:
+      - '--lua-filter=scholarly-metadata.lua'
+      - '--lua-filter=author-info-blocks.lua'
+
+always_allow_html: true
+mainfont: "Times New Roman"
+geometry: "paperheight = 29.7cm, paperwidth = 21cm, left = 2.5cm, right = 2cm, top = 2cm, bottom = 2cm"
+
+abstract:
+  "**Background**: This paper describes the development of low-cost, effective, non-invasive machine learning-based prediction models for Down Syndrome in the first two trimesters of pregnancy in Vietnam. These models are adaptable to different situations with limited screening capacities at community-based healthcare facilities.
+  **Method**: Ultrasound and biochemical testing alone and in combination, from both trimesters were employed to build prediction models based on k-Nearest Neighbor, Support Vector Machine, Random Forest, and Extreme Gradient Boosting algorithms.
+  **Results**: A total of 7,076 pregnant women from a single site in Northern Vietnam  were included, and 1,035 had a fetus with Down Syndrome. Combined ultrasound and biochemical testing were required to achieve the highest accuracy in trimester 2, while models based only on biochemical testing performed as well as models based on combined testing during trimester 1. In trimester 1, Extreme Gradient Boosting produced the best model with 94% accuracy, while Support Vector Machine produced the best model in trimester 2 with 89% accuracy.
+  **Conclusions**: This study explored a range of machine learning models under different testing scenarios. Findings point to the potential feasibility of national screening in low-resource settings after additional model validation and fine tuning is performed."
+
+header-includes:
+  - \usepackage{float}
+  - \usepackage{sectsty}
+  - \usepackage{paralist}
+  - \usepackage{fancyhdr}
+  - \usepackage{setspace}
+  - \usepackage{lastpage}
+  - \usepackage{tocloft}
+  - \usepackage{dcolumn}
+  - \usepackage[square,numbers]{natbib}
+  - \bibliographystyle{abbrvnat}
+  - \usepackage[nottoc, numbib]{tocbibind}
+  - \usepackage{parskip}
+  - \usepackage{indentfirst}
+  - \usepackage{pgf}
+  - \usepackage{amsmath}
+  - \usepackage{booktabs}
+  - \usepackage{graphicx}
+  - \usepackage{longtable}
+  - \usepackage{tabularray}
+  - \usepackage{multirow}
+  - \usepackage{booktabs}
+  - \usepackage{adjustbox}
+  - \usepackage[utf8]{inputenc}
+  - \usepackage[unicode]{hyperref}
+  - \usepackage[fontsize=13pt]{scrextend}
+  - \usepackage[none]{hyphenat}
+  - \usepackage{setspace}\doublespacing
+bibliography: bibliography.bib
+link-citations: true
+csl: american-medical-association.csl
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	fig.pos = "H",
+	out.extra = ""
+)
+options(tinytex.verbose = TRUE)
+
+setwd("E:/K2meep/Final Project/Thesis/Code")
+
+library(bookdown)
+library(magick)
+library(tidyverse)
+library(data.table)
+library(kableExtra)
+library(Gmisc)
+library(readxl)
+library(dplyr)
+library(caret)
+library(DMwR)
+library(kernlab)
+library(randomForest)
+library(mlbench)
+library(e1071)
+library(mice)
+library(pROC)
+library(themis)
+library(glue)
+library(htmlTable)
+library(grid)
+library(magrittr)
+library(table1)
+library(MLmetrics)
+library(DiagrammeR)
+```
+
+```{r import data, include=FALSE}
+data <- read_excel("E:/K2meep/Final Project/Thesis/Data/tsts_08022023.xlsx")
+```
+
+```{r gen mom age, include=FALSE}
+data$tuoime <- as.numeric(format(data$ngaythuchien_thainhi, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$ngaythuchien_thaiphu, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$ngaythuchien_thaiphu, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$ngaythuchien_NST, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$ngaythuchien_NST, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$d_ngaythuchien, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$d_ngaythuchien, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$t_ngaythuchien, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$t_ngaythuchien, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$ngaythuchien_nipt, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$ngaythuchien_nipt, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$ngaythuchien_thala_thaiphu, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$ngaythuchien_thala_thaiphu, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+```
+
+```{r gen fetus age, include=FALSE}
+data$tuoithai_ngay[data$tuoithai_ngay > 6] <- NA
+data$tuoithai_ngay[is.na(data$tuoithai_ngay)] <- 0
+data$tuoithai_tuan[data$tuoithai_tuan < 11 | data$tuoithai_tuan > 23] <- NA
+data$tuoithai <- data$tuoithai_tuan * 7 + data$tuoithai_ngay
+
+# change trimester based on fetus age
+data$sieuamkythun[data$tuoithai <= 97 & (data$sieuamkythun %in% c(2, 3, 4))] <- 1
+data$sieuamkythun[data$tuoithai >= 105 & !is.na(data$tuoithai) & (data$sieuamkythun %in% c(1, 3, 4))] <- 2
+```
+
+```{r cleaning data, include=FALSE}
+# Remove ketluan_hoichungdown if it's equal 0
+data$ketluan_hoichungdown[data$ketluan_hoichungdown == 0] <- NA
+
+# Replace chieudaidaumong
+data$chieudaidaumong[data$sieuamkythun == 2] <- NA
+data$chieudaidaumong[(data$chieudaidaumong > 600 | data$chieudaidaumong < 35) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$chieudaidaumong[data$chieudaidaumong < 38 & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+
+# Replace dau_duongkinhluongdinh
+data$dau_duongkinhluongdinh[(data$dau_duongkinhluongdinh > 31 | data$dau_duongkinhluongdinh == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+#data$dau_duongkinhluongdinh[data$dau_duongkinhluongdinh > 29 & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$dau_duongkinhluongdinh[data$dau_duongkinhluongdinh > 31 & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$dau_duongkinhluongdinh[(data$dau_duongkinhluongdinh > 64 | data$dau_duongkinhluongdinh < 17) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+
+# Replace dau_chuvidau
+data$dau_chuvidau[(data$dau_chuvidau > 107 | data$dau_chuvidau < 48) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+#data$dau_chuvidau[(data$dau_chuvidau > 100 | data$dau_chuvidau < 54) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$dau_chuvidau[(data$dau_chuvidau > 107 | data$dau_chuvidau < 48) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$dau_chuvidau[(data$dau_chuvidau > 227 | data$dau_chuvidau < 82) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+#data$dau_chuvidau[(data$dau_chuvidau > 225 | data$dau_chuvidau < 90) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+data$dau_chuvidau[(data$dau_chuvidau > 227 | data$dau_chuvidau < 82) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace dau_naothatben
+data$dau_naothatben[data$sieuamkythun == 1] <- NA
+data$dau_naothatben[(data$dau_naothatben > 7 | data$dau_naothatben < 3) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$dau_naothatben[(data$dau_naothatben > 7 | data$dau_naothatben < 3) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace mat_khoangcach2homat
+data$mat_khoangcach2homat[data$sieuamkythun == 1] <- NA
+#data$mat_khoangcach2homat[(data$mat_khoangcach2homat > 28 | data$mat_khoangcach2homat < 12) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$mat_khoangcach2homat[(data$mat_khoangcach2homat > 28 | data$mat_khoangcach2homat < 10) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$mat_khoangcach2homat[(data$mat_khoangcach2homat > 28 | data$mat_khoangcach2homat < 10) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace mat_xuongsongmui
+data$mat_xuongsongmui[data$sieuamkythun == 1] <- NA
+data$mat_xuongsongmui[(data$mat_xuongsongmui > 9 | data$mat_xuongsongmui < 1.2) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+#data$mat_xuongsongmui[(data$mat_xuongsongmui > 9 | data$mat_xuongsongmui < 1.4) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+data$mat_xuongsongmui[(data$mat_xuongsongmui > 9 | data$mat_xuongsongmui < 1.2) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace nguc_nhiptimthai
+data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 196 | data$nguc_nhiptimthai < 128) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+#data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 196 | data$nguc_nhiptimthai < 137) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 196 | data$nguc_nhiptimthai < 128) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 177 | data$nguc_nhiptimthai < 130) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+#data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 170 | data$nguc_nhiptimthai < 135) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 177 | data$nguc_nhiptimthai < 130) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace chi_chieudaixuongdui
+data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 14 | data$chi_chieudaixuongdui < 3) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 14 | data$chi_chieudaixuongdui < 3) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 46 | data$chi_chieudaixuongdui < 7) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+#data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 40 | data$chi_chieudaixuongdui < 7) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 46 | data$chi_chieudaixuongdui < 7) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace d_mom_pappa
+data$d_mom_pappa[data$sieuamkythun == 2] <- NA
+data$d_mom_pappa[(data$d_mom_pappa > 1.75 | data$d_mom_pappa < 0.03) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$d_mom_pappa[(data$d_mom_pappa > 1.75 | data$d_mom_pappa < 0.03) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+
+# Replace d_mom_hcgb
+data$d_mom_hcgb[data$sieuamkythun == 2] <- NA
+data$d_mom_hcgb[(data$d_mom_hcgb > 3.8 | data$d_mom_hcgb == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$d_mom_hcgb[(data$d_mom_hcgb > 3.8 | data$d_mom_hcgb == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+
+# Replace t_mom_ue3
+data$t_mom_ue3[data$sieuamkythun == 1] <- NA
+data$t_mom_ue3[(data$t_mom_ue3 > 1.92 | data$t_mom_ue3 == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$t_mom_ue3[(data$t_mom_ue3 > 1.92 | data$t_mom_ue3 == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace t_mom_afp
+data$t_mom_afp[data$sieuamkythun == 1] <- NA
+data$t_mom_afp[(data$t_mom_afp > 1.53 | data$t_mom_afp == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$t_mom_afp[(data$t_mom_afp > 1.53 | data$t_mom_afp == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace t_mom_hcg
+data$t_mom_hcg[data$sieuamkythun == 1] <- NA
+data$t_mom_hcg[(data$t_mom_hcg > 4.5 | data$t_mom_hcg == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$t_mom_hcg[(data$t_mom_hcg > 4.5 | data$t_mom_hcg == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace d_khoangsangsaugay
+data$d_khoangsangsaugay[data$sieuamkythun == 2] <- NA
+data$d_khoangsangsaugay[(data$d_khoangsangsaugay > 4 | data$d_khoangsangsaugay == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$d_khoangsangsaugay[(data$d_khoangsangsaugay > 4 | data$d_khoangsangsaugay == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$d_khoangsangsaugay[is.na(data$d_khoangsangsaugay)] <- data$co_khoangsangsaugay[is.na(data$d_khoangsangsaugay)]
+data$d_khoangsangsaugay[data$sieuamkythun == 2] <- NA
+data$d_khoangsangsaugay[(data$d_khoangsangsaugay > 5.9 | data$d_khoangsangsaugay == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$d_khoangsangsaugay[(data$d_khoangsangsaugay > 5.9 | data$d_khoangsangsaugay == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+```
+
+```{r recode variable, include=FALSE}
+# Recode ketluan_hoichungdown
+data$ketluan_hoichungdown[data$ketluan_hoichungdown == 1] <- 0
+data$ketluan_hoichungdown[data$ketluan_hoichungdown == 2] <- 1
+data$ketluan_hoichungdown <- as.factor(data$ketluan_hoichungdown)
+data$ketluan_hoichungdown <- ifelse(data$ketluan_hoichungdown == 0, "No", "Yes")
+#data$ketluan_hoichungdown <- make.names(data$ketluan_hoichungdown)
+
+# Consider dulieu_kiemdinh as factor variable
+data$dulieu_kiemdinh <- as.factor(data$dulieu_kiemdinh)
+
+# Recode tiensusinhconhoichungdown
+data$tiensusinhconhoichungdown[data$tiensusinhconhoichungdown == 2] <- 0
+data$tiensusinhconhoichungdown <- as.factor(data$tiensusinhconhoichungdown)
+
+# Recode mat_moimui
+data$mat_moimui[data$mat_moimui == 1] <- 0
+data$mat_moimui[data$mat_moimui == 2] <- 1
+data$mat_moimui <- as.factor(data$mat_moimui)
+
+# Recode nguc_ditattim
+data$nguc_ditattim[data$nguc_ditattim == 2] <- 0
+data$nguc_ditattim <- as.factor(data$nguc_ditattim)
+```
+
+```{r define normalize function, include=FALSE}
+normalize <- function(x) {
+    norm <- ((x - min(x))/(max(x) - min(x)))
+    return (norm)
+}
+```
+
+```{r define model report function, include=FALSE}
+MySummary  <- function(data, lev = NULL, model = NULL){
+  a1 <- defaultSummary(data, lev, model)
+  b1 <- twoClassSummary(data, lev, model)
+  c1 <- prSummary(data, lev, model)
+  out <- c(a1, b1, c1)
+  out}
+```
+
+```{r display function, include=FALSE}
+my.render.cont <- function(x) {
+    with(stats.default(x), 
+         c("",
+           
+          "Mean (SD)" = sprintf("%s (%s)",
+                                round_pad(MEAN, 1),
+                                round_pad(SD, 1)),
+         
+          "Median (IQR)" = sprintf("%s (%s, %s)",
+                                       round_pad(MEDIAN, 1), 
+                                       round_pad(Q1, 1), 
+                                       round_pad(Q3, 1)))
+    )
+}
+my.render.cat <- function(x, ...) {
+  levels <- levels(x)
+  if (length(levels) == 2 & levels[2] == "Yes" ) {
+    # Get the table for the factor levels
+    tab <- table(x)
+    # Assume that the first level is the one you want to display
+    levelToDisplay <- levels[2]
+    count <- tab[levelToDisplay]
+    percent <- prop.table(tab)[levelToDisplay] * 100
+    # Format the string to show level, count and percentage
+    result <- paste0(count, " (", formatC(percent, format = "f", digits = 1), "%)")
+    return(result)
+  } else {
+    c("", sapply(stats.default(x), function(y) with(y,
+                                                    sprintf("%d (%0.1f %%)", FREQ, PCT))))
+  }
+}
+```
+
+```{r sa_tk1, include=FALSE}
+# Get ultrasound semeter 1 ultrasound data
+sa_tk1 <- data %>%
+  filter(sieuamkythun == 1,
+         !is.na(tuoime),
+         !is.na(tuoithai),
+         !is.na(tiensusinhconhoichungdown),
+         !is.na(chieudaidaumong),
+         !is.na(dau_duongkinhluongdinh),
+         !is.na(dau_chuvidau),
+         !is.na(mat_moimui),
+         !is.na(nguc_nhiptimthai),
+         !is.na(d_khoangsangsaugay),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(dulieu_kiemdinh,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 1 ultrasound data, include=FALSE}
+# Get the dataset without dependent variable ketluan_hoichungdown
+sa_tk1_impute_model_data <- sa_tk1[, !(colnames(sa_tk1) == "ketluan_hoichungdown")]
+
+ignore <- sa_tk1_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the dataset
+sa_tk1_imputed <- mice(sa_tk1_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sa_tk1_impute_model_data)
+
+# Impute missing values in testing set
+sa_tk1_imputed <- complete(sa_tk1_imputed)
+
+sa_tk1_imputed <- cbind(sa_tk1_imputed, sa_tk1[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sa_tk1, include=FALSE}
+# Get ultrasound semeter 1 training data
+train_valid_sa_tk1 <- sa_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r valid_sa_tk1, include=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(train_valid_sa_tk1$ketluan_hoichungdown, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train_sa_tk1 <- train_valid_sa_tk1[ trainIndex,]
+valid_sa_tk1 <- train_valid_sa_tk1[-trainIndex,]
+```
+
+```{r test_sa_tk1, include=FALSE}
+# Get ultrasound semeter 1 testing data
+test_sa_tk1 <- sa_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r smote_train_sa_tk1, include=FALSE}
+# Perform SMOTENC oversampling method
+set.seed(123)
+train_sa_tk1$ketluan_hoichungdown = as.factor(train_sa_tk1$ketluan_hoichungdown)
+smote_train_sa_tk1 <- smotenc(train_sa_tk1, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+```
+
+```{r sa_tk1 preprocessing, include=FALSE}
+prepro_knn_sa_tk1 <- preProcess(train_sa_tk1, method = c("center", "scale"))
+knn_train_sa_tk1 <- predict(prepro_knn_sa_tk1, smote_train_sa_tk1)
+knn_valid_sa_tk1 <- predict(prepro_knn_sa_tk1, valid_sa_tk1)
+knn_test_sa_tk1 <- predict(prepro_knn_sa_tk1, test_sa_tk1)
+
+prepro_svm_sa_tk1 <- preProcess(train_sa_tk1, method = c("center", "scale"))
+svm_train_sa_tk1 <- predict(prepro_svm_sa_tk1, smote_train_sa_tk1)
+svm_valid_sa_tk1 <- predict(prepro_svm_sa_tk1, valid_sa_tk1)
+svm_test_sa_tk1 <- predict(prepro_svm_sa_tk1, test_sa_tk1)
+```
+
+```{r sa_tk1 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sa_tk1 <- train(ketluan_hoichungdown~., data=knn_train_sa_tk1, method="knn", tuneGrid = data.frame(k = 26), trControl=trainControl, metric = "Accuracy")
+
+knn_sa_tk1
+```
+
+```{r validate sa_tk1 knn model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_knn_sa_tk1 <- predict(knn_sa_tk1, newdata = knn_valid_sa_tk1, type = "prob")
+
+# Draw the ROC
+cf_valid_knn_sa_tk1 <- plot.roc(knn_valid_sa_tk1$ketluan_hoichungdown, prediction_valid_knn_sa_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_knn_sa_tk1 <- pROC::roc(knn_valid_sa_tk1$ketluan_hoichungdown, prediction_valid_knn_sa_tk1[,1])
+coords_valid_knn_sa_tk1 <- coords(rp_valid_knn_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_knn_sa_tk1
+```
+
+```{r test sa_tk1 knn model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_knn_sa_tk1 <- predict(knn_sa_tk1, newdata = knn_test_sa_tk1, type = "prob")
+
+# Draw the ROC
+cf_knn_sa_tk1 <- plot.roc(knn_test_sa_tk1$ketluan_hoichungdown, prediction_knn_sa_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_knn_sa_tk1 <- pROC::roc(knn_test_sa_tk1$ketluan_hoichungdown, prediction_knn_sa_tk1[,1])
+coords_knn_sa_tk1 <- coords(rp_knn_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_knn_sa_tk1
+```
+
+```{r sa_tk1 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sa_tk1 <- train(ketluan_hoichungdown~., data = svm_train_sa_tk1, method = "svmLinear", trControl = trainControl, tuneGrid = expand.grid(C = 0.1), metric = "Accuracy")
+
+svm_sa_tk1
+```
+
+```{r validate sa_tk1 svm model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_svm_sa_tk1 <- predict(svm_sa_tk1, newdata = svm_valid_sa_tk1, type = "prob")
+
+# Draw the ROC
+cf_valid_svm_sa_tk1 <- plot.roc(svm_valid_sa_tk1$ketluan_hoichungdown, prediction_valid_svm_sa_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_svm_sa_tk1 <- pROC::roc(svm_valid_sa_tk1$ketluan_hoichungdown, prediction_valid_svm_sa_tk1[,1])
+coords_valid_svm_sa_tk1 <- coords(rp_valid_svm_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_svm_sa_tk1
+```
+
+```{r test sa_tk1 svm model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_svm_sa_tk1 <- predict(svm_sa_tk1, newdata = svm_test_sa_tk1, type = "prob")
+
+# Draw the ROC
+cf_svm_sa_tk1 <- plot.roc(svm_test_sa_tk1$ketluan_hoichungdown, prediction_svm_sa_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_svm_sa_tk1 <- pROC::roc(svm_test_sa_tk1$ketluan_hoichungdown, prediction_svm_sa_tk1[,1])
+coords_svm_sa_tk1 <- coords(rp_svm_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_svm_sa_tk1
+```
+
+```{r sa_tk1 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sa_tk1 <- train(ketluan_hoichungdown~., data = train_sa_tk1, method = "rf", trControl = trainControl, tuneGrid = expand.grid(.mtry=1), ntree = 50, max_depth = 3, metric = "Accuracy")
+
+rf_sa_tk1
+```
+
+```{r validate sa_tk1 rf model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_rf_sa_tk1 <- predict(rf_sa_tk1, newdata = valid_sa_tk1, type = "prob")
+
+# Draw the ROC
+cf_valid_rf_sa_tk1 <- plot.roc(valid_sa_tk1$ketluan_hoichungdown, prediction_valid_rf_sa_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_rf_sa_tk1 <- pROC::roc(valid_sa_tk1$ketluan_hoichungdown, prediction_valid_rf_sa_tk1[,1])
+coords_valid_rf_sa_tk1 <- coords(rp_valid_rf_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_rf_sa_tk1
+```
+
+```{r test sa_tk1 rf model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_rf_sa_tk1 <- predict(rf_sa_tk1, newdata = test_sa_tk1, type = "prob")
+
+# Draw the ROC
+cf_rf_sa_tk1 <- plot.roc(test_sa_tk1$ketluan_hoichungdown, prediction_rf_sa_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_rf_sa_tk1 <- pROC::roc(test_sa_tk1$ketluan_hoichungdown, prediction_rf_sa_tk1[,1])
+coords_rf_sa_tk1 <- coords(rp_rf_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_rf_sa_tk1
+```
+
+```{r sa_tk1 xgb model, include=FALSE}
+tune_grid <- expand.grid(
+  nrounds = c(200),
+  eta = c(0.1),
+  max_depth = c(5),
+  gamma = c(0),
+  colsample_bytree = c(0.6),
+  min_child_weight = c(2),
+  subsample = c(0.6)
+)
+
+# tune_grid <- expand.grid(
+#   nrounds = c(200),
+#   eta = c(0.3),
+#   max_depth = c(3),
+#   gamma = c(0),
+#   colsample_bytree = c(0.8),
+#   min_child_weight = c(1),
+#   subsample = c(1)
+# )
+
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sa_tk1 <- train(ketluan_hoichungdown~., data = train_sa_tk1, method = "xgbTree", trControl = trainControl, tuneGrid = tune_grid, metric = "Accuracy", verbosity = 0)
+
+xgb_sa_tk1
+```
+
+```{r validate sa_tk1 xgb model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_xgb_sa_tk1 <- predict(xgb_sa_tk1, newdata = valid_sa_tk1, type = "prob")
+
+# Draw the ROC
+cf_valid_xgb_sa_tk1 <- plot.roc(valid_sa_tk1$ketluan_hoichungdown, prediction_valid_xgb_sa_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_xgb_sa_tk1 <- pROC::roc(valid_sa_tk1$ketluan_hoichungdown, prediction_valid_xgb_sa_tk1[,1])
+coords_valid_xgb_sa_tk1 <- coords(rp_valid_xgb_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_xgb_sa_tk1
+```
+
+```{r test sa_tk1 xgb model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_xgb_sa_tk1 <- predict(xgb_sa_tk1, newdata = test_sa_tk1, type = "prob")
+
+# Draw the ROC
+cf_xgb_sa_tk1 <- plot.roc(test_sa_tk1$ketluan_hoichungdown, prediction_xgb_sa_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_xgb_sa_tk1 <- pROC::roc(test_sa_tk1$ketluan_hoichungdown, prediction_xgb_sa_tk1[,1])
+coords_xgb_sa_tk1 <- coords(rp_xgb_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_xgb_sa_tk1
+```
+
+```{r sh_tk1, include=FALSE}
+# Get ultrasound semeter 1 ultrasound data
+sh_tk1 <- data %>%
+  filter(sieuamkythun == 1,
+         !is.na(d_mom_pappa),
+         !is.na(d_mom_hcgb),
+         !is.na(d_khoangsangsaugay),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(dulieu_kiemdinh,
+         d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 1 biochemical data, include=FALSE}
+# Get the dataset without dependent variable ketluan_hoichungdown
+sh_tk1_impute_model_data <- sh_tk1[, !(colnames(sh_tk1) == "ketluan_hoichungdown")]
+
+ignore <- sh_tk1_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the dataset
+sh_tk1_imputed <- mice(sh_tk1_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sh_tk1_impute_model_data)
+
+# Impute missing values in testing set
+sh_tk1_imputed <- complete(sh_tk1_imputed)
+
+sh_tk1_imputed <- cbind(sh_tk1_imputed, sh_tk1[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sh_tk1, include=FALSE}
+# Get ultrasound semeter 1 training data
+train_valid_sh_tk1 <- sh_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r valid_sh_tk1, include=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(train_valid_sh_tk1$ketluan_hoichungdown, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train_sh_tk1 <- train_valid_sh_tk1[ trainIndex,]
+valid_sh_tk1 <- train_valid_sh_tk1[-trainIndex,]
+```
+
+```{r test_sh_tk1, include=FALSE}
+# Get ultrasound semeter 1 testing data
+test_sh_tk1 <- sh_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r smote_train_sh_tk1, include=FALSE}
+# Perform SMOTENC overshmpling method
+set.seed(123)
+train_sh_tk1$ketluan_hoichungdown = as.factor(train_sh_tk1$ketluan_hoichungdown)
+smote_train_sh_tk1 <- smotenc(train_sh_tk1, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+```
+
+```{r sh_tk1 preprocessing, include=FALSE}
+prepro_knn_sh_tk1 <- preProcess(train_sh_tk1, method = c("center", "scale"))
+knn_train_sh_tk1 <- predict(prepro_knn_sh_tk1, smote_train_sh_tk1)
+knn_valid_sh_tk1 <- predict(prepro_knn_sh_tk1, valid_sh_tk1)
+knn_test_sh_tk1 <- predict(prepro_knn_sh_tk1, test_sh_tk1)
+
+prepro_svm_sh_tk1 <- preProcess(train_sh_tk1, method = c("center", "scale"))
+svm_train_sh_tk1 <- predict(prepro_svm_sh_tk1, smote_train_sh_tk1)
+svm_valid_sh_tk1 <- predict(prepro_svm_sh_tk1, valid_sh_tk1)
+svm_test_sh_tk1 <- predict(prepro_svm_sh_tk1, test_sh_tk1)
+```
+
+```{r sh_tk1 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sh_tk1 <- train(ketluan_hoichungdown~., data=knn_train_sh_tk1, method="knn", trControl=trainControl, tuneGrid = data.frame(k = 9), metric = "Accuracy")
+
+knn_sh_tk1
+```
+
+```{r validate sh_tk1 knn model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_knn_sh_tk1 <- predict(knn_sh_tk1, newdata = knn_valid_sh_tk1, type = "prob")
+
+# Draw the ROC
+cf_valid_knn_sh_tk1 <- plot.roc(knn_valid_sh_tk1$ketluan_hoichungdown, prediction_valid_knn_sh_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_knn_sh_tk1 <- pROC::roc(knn_valid_sh_tk1$ketluan_hoichungdown, prediction_valid_knn_sh_tk1[,1])
+coords_valid_knn_sh_tk1 <- coords(rp_valid_knn_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_knn_sh_tk1
+```
+
+```{r test sh_tk1 knn model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_knn_sh_tk1 <- predict(knn_sh_tk1, newdata = knn_test_sh_tk1, type = "prob")
+
+# Draw the ROC
+cf_knn_sh_tk1 <- plot.roc(knn_test_sh_tk1$ketluan_hoichungdown, prediction_knn_sh_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_knn_sh_tk1 <- pROC::roc(knn_test_sh_tk1$ketluan_hoichungdown, prediction_knn_sh_tk1[,1])
+coords_knn_sh_tk1 <- coords(rp_knn_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_knn_sh_tk1
+```
+
+```{r sh_tk1 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sh_tk1 <- train(ketluan_hoichungdown~., data = svm_train_sh_tk1, method = "svmLinear", trControl = trainControl, tuneGrid = expand.grid(C = 0.0001), metric = "Accuracy")
+
+svm_sh_tk1
+```
+
+```{r validate sh_tk1 svm model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_svm_sh_tk1 <- predict(svm_sh_tk1, newdata = svm_valid_sh_tk1, type = "prob")
+
+# Draw the ROC
+cf_valid_svm_sh_tk1 <- plot.roc(svm_valid_sh_tk1$ketluan_hoichungdown, prediction_valid_svm_sh_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_svm_sh_tk1 <- pROC::roc(svm_valid_sh_tk1$ketluan_hoichungdown, prediction_valid_svm_sh_tk1[,1])
+coords_valid_svm_sh_tk1 <- coords(rp_valid_svm_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_svm_sh_tk1
+```
+
+```{r test sh_tk1 svm model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_svm_sh_tk1 <- predict(svm_sh_tk1, newdata = svm_test_sh_tk1, type = "prob")
+
+# Draw the ROC
+cf_svm_sh_tk1 <- plot.roc(svm_test_sh_tk1$ketluan_hoichungdown, prediction_svm_sh_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_svm_sh_tk1 <- pROC::roc(svm_test_sh_tk1$ketluan_hoichungdown, prediction_svm_sh_tk1[,1])
+coords_svm_sh_tk1 <- coords(rp_svm_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_svm_sh_tk1
+```
+
+```{r sh_tk1 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sh_tk1 <- train(ketluan_hoichungdown~., data = train_sh_tk1, method = "rf", trControl = trainControl, tuneGrid = expand.grid(.mtry=3), ntree = 50, max_depth = 3, metric = "Accuracy")
+
+rf_sh_tk1
+```
+
+```{r validate sh_tk1 rf model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_rf_sh_tk1 <- predict(rf_sh_tk1, newdata = valid_sh_tk1, type = "prob")
+
+# Draw the ROC
+cf_valid_rf_sh_tk1 <- plot.roc(valid_sh_tk1$ketluan_hoichungdown, prediction_valid_rf_sh_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_rf_sh_tk1 <- pROC::roc(valid_sh_tk1$ketluan_hoichungdown, prediction_valid_rf_sh_tk1[,1])
+coords_valid_rf_sh_tk1 <- coords(rp_valid_rf_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_rf_sh_tk1
+```
+
+```{r test sh_tk1 rf model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_rf_sh_tk1 <- predict(rf_sh_tk1, newdata = test_sh_tk1, type = "prob")
+
+# Draw the ROC
+cf_rf_sh_tk1 <- plot.roc(test_sh_tk1$ketluan_hoichungdown, prediction_rf_sh_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_rf_sh_tk1 <- pROC::roc(test_sh_tk1$ketluan_hoichungdown, prediction_rf_sh_tk1[,1])
+coords_rf_sh_tk1 <- coords(rp_rf_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_rf_sh_tk1
+```
+
+```{r sh_tk1 xgb model, include=FALSE}
+tune_grid <- expand.grid(
+  nrounds = c(100),
+  eta = c(0.1),
+  max_depth = c(3),
+  gamma = c(0),
+  colsample_bytree = c(1),
+  min_child_weight = c(5),
+  subsample = c(1)
+)
+
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sh_tk1 <- train(ketluan_hoichungdown~., data = train_sh_tk1, method = "xgbTree", trControl = trainControl, tuneGrid = tune_grid, metric = "Accuracy", verbosity = 0)
+
+xgb_sh_tk1
+```
+
+```{r validate sh_tk1 xgb model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_xgb_sh_tk1 <- predict(xgb_sh_tk1, newdata = valid_sh_tk1, type = "prob")
+
+# Draw the ROC
+cf_valid_xgb_sh_tk1 <- plot.roc(valid_sh_tk1$ketluan_hoichungdown, prediction_valid_xgb_sh_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_xgb_sh_tk1 <- pROC::roc(valid_sh_tk1$ketluan_hoichungdown, prediction_valid_xgb_sh_tk1[,1])
+coords_valid_xgb_sh_tk1 <- coords(rp_valid_xgb_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_xgb_sh_tk1
+```
+
+```{r test sh_tk1 xgb model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_xgb_sh_tk1 <- predict(xgb_sh_tk1, newdata = test_sh_tk1, type = "prob")
+
+# Draw the ROC
+cf_xgb_sh_tk1 <- plot.roc(test_sh_tk1$ketluan_hoichungdown, prediction_xgb_sh_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_xgb_sh_tk1 <- pROC::roc(test_sh_tk1$ketluan_hoichungdown, prediction_xgb_sh_tk1[,1])
+coords_xgb_sh_tk1 <- coords(rp_xgb_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_xgb_sh_tk1
+```
+
+```{r sash_tk1, include=FALSE}
+# Get trimester 1 ultrasound and biochemical data
+sash_tk1 <- data %>%
+  filter(sieuamkythun == 1,
+         !is.na(tuoime),
+         !is.na(tuoithai),
+         !is.na(tiensusinhconhoichungdown),
+         !is.na(chieudaidaumong),
+         !is.na(dau_duongkinhluongdinh),
+         !is.na(dau_chuvidau),
+         !is.na(mat_moimui),
+         !is.na(nguc_nhiptimthai),
+         !is.na(d_mom_pappa),
+         !is.na(d_mom_hcgb),
+         !is.na(d_khoangsangsaugay),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(sieuamkythun,
+         dulieu_kiemdinh,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 1 ultrasound and biochemical data, include=FALSE}
+# Get the dataset without dependent variable ketluan_hoichungdown
+sash_tk1_impute_model_data <- sash_tk1[, !(colnames(sash_tk1) == "ketluan_hoichungdown")]
+
+ignore <- sash_tk1_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the dataset
+sash_tk1_imputed <- mice(sash_tk1_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sash_tk1_impute_model_data)
+
+# Impute missing values in testing set
+sash_tk1_imputed <- complete(sash_tk1_imputed)
+
+sash_tk1_imputed <- cbind(sash_tk1_imputed, sash_tk1[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sash_tk1, include=FALSE}
+# Get ultrasound and biochemical semeter 1 training data
+train_valid_sash_tk1 <- sash_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r valid_sash_tk1, include=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(train_valid_sash_tk1$ketluan_hoichungdown, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train_sash_tk1 <- train_valid_sash_tk1[ trainIndex,]
+valid_sash_tk1 <- train_valid_sash_tk1[-trainIndex,]
+```
+
+```{r test_sash_tk1, include=FALSE}
+# Get ultrasound and biochemical semeter 1 testing data
+test_sash_tk1 <- sash_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r smote_sash_tk1, include=FALSE}
+# Perform SMOTE oversampling method
+set.seed(123)
+train_sash_tk1$ketluan_hoichungdown = as.factor(train_sash_tk1$ketluan_hoichungdown)
+smote_train_sash_tk1 <- smotenc(train_sash_tk1, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+```
+
+```{r sash_tk1 preprocessing, include=FALSE}
+prepro_knn_sash_tk1 <- preProcess(train_sash_tk1, method = c("center", "scale"))
+knn_train_sash_tk1 <- predict(prepro_knn_sash_tk1, smote_train_sash_tk1)
+knn_valid_sash_tk1 <- predict(prepro_knn_sash_tk1, valid_sash_tk1)
+knn_test_sash_tk1 <- predict(prepro_knn_sash_tk1, test_sash_tk1)
+
+prepro_svm_sash_tk1 <- preProcess(train_sash_tk1, method = c("center", "scale"))
+svm_train_sash_tk1 <- predict(prepro_svm_sash_tk1, smote_train_sash_tk1)
+svm_valid_sash_tk1 <- predict(prepro_svm_sash_tk1, valid_sash_tk1)
+svm_test_sash_tk1 <- predict(prepro_svm_sash_tk1, test_sash_tk1)
+```
+
+```{r sash_tk1 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sash_tk1 <- train(ketluan_hoichungdown~., data=knn_train_sash_tk1, method="knn", trControl=trainControl, tuneGrid = data.frame(k = 12), metric = "Accuracy")
+
+knn_sash_tk1
+```
+
+```{r validate sash_tk1 knn model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_knn_sash_tk1 <- predict(knn_sash_tk1, newdata = knn_valid_sash_tk1, type = "prob")
+
+# Draw the ROC
+cf_valid_knn_sash_tk1 <- plot.roc(knn_valid_sash_tk1$ketluan_hoichungdown, prediction_valid_knn_sash_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_knn_sash_tk1 <- pROC::roc(knn_valid_sash_tk1$ketluan_hoichungdown, prediction_valid_knn_sash_tk1[,1])
+coords_valid_knn_sash_tk1 <- coords(rp_valid_knn_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_knn_sash_tk1
+```
+
+```{r test sash_tk1 knn model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_knn_sash_tk1 <- predict(knn_sash_tk1, newdata = knn_test_sash_tk1, type = "prob")
+
+# Draw the ROC
+cf_knn_sash_tk1 <- plot.roc(knn_test_sash_tk1$ketluan_hoichungdown, prediction_knn_sash_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_knn_sash_tk1 <- pROC::roc(knn_test_sash_tk1$ketluan_hoichungdown, prediction_knn_sash_tk1[,1])
+coords_knn_sash_tk1 <- coords(rp_knn_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_knn_sash_tk1
+```
+
+```{r sash_tk1 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sash_tk1 <- train(ketluan_hoichungdown~., data = svm_train_sash_tk1, method = "svmLinear", trControl = trainControl, tuneGrid = expand.grid(C = 0.5), metric = "Accuracy")
+
+svm_sash_tk1
+```
+
+```{r validate sash_tk1 svm model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_svm_sash_tk1 <- predict(svm_sash_tk1, newdata = svm_valid_sash_tk1, type = "prob")
+
+# Draw the ROC
+cf_valid_svm_sash_tk1 <- plot.roc(svm_valid_sash_tk1$ketluan_hoichungdown, prediction_valid_svm_sash_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_svm_sash_tk1 <- pROC::roc(svm_valid_sash_tk1$ketluan_hoichungdown, prediction_valid_svm_sash_tk1[,1])
+coords_valid_svm_sash_tk1 <- coords(rp_valid_svm_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_svm_sash_tk1
+```
+
+```{r test sash_tk1 svm model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_svm_sash_tk1 <- predict(svm_sash_tk1, newdata = svm_test_sash_tk1, type = "prob")
+
+# Draw the ROC
+cf_svm_sash_tk1 <- plot.roc(svm_test_sash_tk1$ketluan_hoichungdown, prediction_svm_sash_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_svm_sash_tk1 <- pROC::roc(svm_test_sash_tk1$ketluan_hoichungdown, prediction_svm_sash_tk1[,1])
+coords_svm_sash_tk1 <- coords(rp_svm_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_svm_sash_tk1
+```
+
+```{r sash_tk1 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sash_tk1 <- train(ketluan_hoichungdown~., data = train_sash_tk1, method = "rf", trControl = trainControl, tuneGrid = expand.grid(.mtry=2), ntree = 200, max_depth = 2,  metric = "Accuracy")
+
+rf_sash_tk1
+```
+
+```{r validate sash_tk1 rf model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_rf_sash_tk1 <- predict(rf_sash_tk1, newdata = valid_sash_tk1, type = "prob")
+
+# Draw the ROC
+cf_valid_rf_sash_tk1 <- plot.roc(valid_sash_tk1$ketluan_hoichungdown, prediction_valid_rf_sash_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_rf_sash_tk1 <- pROC::roc(valid_sash_tk1$ketluan_hoichungdown, prediction_valid_rf_sash_tk1[,1])
+coords_valid_rf_sash_tk1 <- coords(rp_valid_rf_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_rf_sash_tk1
+```
+
+```{r test sash_tk1 rf model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_rf_sash_tk1 <- predict(rf_sash_tk1, newdata = test_sash_tk1, type = "prob")
+
+# Draw the ROC
+cf_rf_sash_tk1 <- plot.roc(test_sash_tk1$ketluan_hoichungdown, prediction_rf_sash_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_rf_sash_tk1 <- pROC::roc(test_sash_tk1$ketluan_hoichungdown, prediction_rf_sash_tk1[,1])
+coords_rf_sash_tk1 <- coords(rp_rf_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_rf_sash_tk1
+```
+
+```{r sash_tk1 xgb model, include=FALSE}
+# tune_grid <- expand.grid(
+#   nrounds = c(150),
+#   eta = c(0.3),
+#   max_depth = c(3),
+#   gamma = c(1),
+#   colsample_bytree = c(0.8),
+#   min_child_weight = c(0.8),
+#   subsample = c(0.75)
+# )
+
+tune_grid <- expand.grid(
+  nrounds = c(200),
+  eta = c(0.1),
+  max_depth = c(5),
+  gamma = c(0),
+  colsample_bytree = c(0.6),
+  min_child_weight = c(1),
+  subsample = c(0.6)
+)
+
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sash_tk1 <- train(ketluan_hoichungdown~., data = train_sash_tk1, method = "xgbTree", trControl = trainControl, tuneGrid = tune_grid, metric = "Accuracy", verbosity = 0)
+
+xgb_sash_tk1
+```
+
+```{r validate sash_tk1 xgb model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_xgb_sash_tk1 <- predict(xgb_sash_tk1, newdata = valid_sash_tk1, type = "prob")
+
+# Draw the ROC
+cf_valid_xgb_sash_tk1 <- plot.roc(valid_sash_tk1$ketluan_hoichungdown, prediction_valid_xgb_sash_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_xgb_sash_tk1 <- pROC::roc(valid_sash_tk1$ketluan_hoichungdown, prediction_valid_xgb_sash_tk1[,1])
+coords_valid_xgb_sash_tk1 <- coords(rp_valid_xgb_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_xgb_sash_tk1
+```
+
+```{r test sash_tk1 xgb model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_xgb_sash_tk1 <- predict(xgb_sash_tk1, newdata = test_sash_tk1, type = "prob")
+
+# Draw the ROC
+cf_xgb_sash_tk1 <- plot.roc(test_sash_tk1$ketluan_hoichungdown, prediction_xgb_sash_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_xgb_sash_tk1 <- pROC::roc(test_sash_tk1$ketluan_hoichungdown, prediction_xgb_sash_tk1[,1])
+coords_xgb_sash_tk1 <- coords(rp_xgb_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_xgb_sash_tk1
+```
+
+```{r sa_tk2, include=FALSE}
+# Get ultrasound semeter 2 ultrasound data
+sa_tk2 <- data %>%
+  filter(sieuamkythun == 2,
+         !is.na(tuoime),
+         !is.na(tuoithai),
+         !is.na(tiensusinhconhoichungdown),
+         !is.na(dau_duongkinhluongdinh),
+         !is.na(dau_chuvidau),
+         #!is.na(dau_naothatben),
+         #!is.na(mat_khoangcach2homat),
+         #!is.na(mat_xuongsongmui),
+         !is.na(mat_moimui),
+         !is.na(nguc_nhiptimthai),
+         !is.na(nguc_ditattim),
+         !is.na(chi_chieudaixuongdui),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(sieuamkythun,
+         dulieu_kiemdinh,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         mat_moimui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 2 ultrasound data, message=FALSE, warning=FALSE, include=FALSE}
+# Get the dataset without dependent variable ketluan_hoichungdown
+sa_tk2_impute_model_data <- sa_tk2[, !(colnames(sa_tk2) == "ketluan_hoichungdown")]
+
+ignore <- sa_tk2_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the dataset
+sa_tk2_imputed <- mice(sa_tk2_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sa_tk2_impute_model_data)
+
+# Impute missing values in testing set
+sa_tk2_imputed <- complete(sa_tk2_imputed)
+
+sa_tk2_imputed <- cbind(sa_tk2_imputed, sa_tk2[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sa_tk2, include=FALSE}
+# Get ultrasound trimester 2 training data
+train_valid_sa_tk2 <- sa_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         mat_moimui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r valid_sa_tk2, include=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(train_valid_sa_tk2$ketluan_hoichungdown, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train_sa_tk2 <- train_valid_sa_tk2[ trainIndex,]
+valid_sa_tk2 <- train_valid_sa_tk2[-trainIndex,]
+```
+
+```{r test_sa_tk2, include=FALSE}
+# Get ultrasound trimester 2 testing data
+test_sa_tk2 <- sa_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,         
+         mat_moimui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r smote_train_sa_tk2, include=FALSE}
+# Perform SMOTE oversampling method
+set.seed(123)
+train_sa_tk2$ketluan_hoichungdown = as.factor(train_sa_tk2$ketluan_hoichungdown)
+smote_train_sa_tk2 <- smotenc(train_sa_tk2, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+```
+
+```{r sa_tk2 preprocessing, include=FALSE}
+prepro_knn_sa_tk2 <- preProcess(train_sa_tk2, method = c("center", "scale"))
+knn_train_sa_tk2 <- predict(prepro_knn_sa_tk2, smote_train_sa_tk2)
+knn_valid_sa_tk2 <- predict(prepro_knn_sa_tk2, valid_sa_tk2)
+knn_test_sa_tk2 <- predict(prepro_knn_sa_tk2, test_sa_tk2)
+
+prepro_svm_sa_tk2 <- preProcess(train_sa_tk2, method = c("center", "scale"))
+svm_train_sa_tk2 <- predict(prepro_svm_sa_tk2, smote_train_sa_tk2)
+svm_valid_sa_tk2 <- predict(prepro_svm_sa_tk2, valid_sa_tk2)
+svm_test_sa_tk2 <- predict(prepro_svm_sa_tk2, test_sa_tk2)
+```
+
+```{r sa_tk2 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sa_tk2 <- train(ketluan_hoichungdown~., data=knn_train_sa_tk2, method="knn", trControl=trainControl, tuneGrid = data.frame(k = 36), metric = "Accuracy")
+
+knn_sa_tk2
+```
+
+```{r validate sa_tk2 knn model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_knn_sa_tk2 <- predict(knn_sa_tk2, newdata = knn_valid_sa_tk2, type = "prob")
+
+# Draw the ROC
+cf_valid_knn_sa_tk2 <- plot.roc(knn_valid_sa_tk2$ketluan_hoichungdown, prediction_valid_knn_sa_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_knn_sa_tk2 <- pROC::roc(knn_valid_sa_tk2$ketluan_hoichungdown, prediction_valid_knn_sa_tk2[,1])
+coords_valid_knn_sa_tk2 <- coords(rp_valid_knn_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_knn_sa_tk2
+```
+
+```{r test sa_tk2 knn model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_knn_sa_tk2 <- predict(knn_sa_tk2, newdata = knn_test_sa_tk2, type = "prob")
+
+# Draw the ROC
+cf_knn_sa_tk2 <- plot.roc(knn_test_sa_tk2$ketluan_hoichungdown, prediction_knn_sa_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_knn_sa_tk2 <- pROC::roc(knn_test_sa_tk2$ketluan_hoichungdown, prediction_knn_sa_tk2[,1])
+coords_knn_sa_tk2 <- coords(rp_knn_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_knn_sa_tk2
+```
+
+```{r sa_tk2 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sa_tk2 <- train(ketluan_hoichungdown~., data = svm_train_sa_tk2, method = "svmLinear", trControl = trainControl, tuneGrid = expand.grid(C = 0.02), metric = "Accuracy")
+
+svm_sa_tk2
+```
+
+```{r validate sa_tk2 svm model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_svm_sa_tk2 <- predict(svm_sa_tk2, newdata = svm_valid_sa_tk2, type = "prob")
+
+# Draw the ROC
+cf_valid_svm_sa_tk2 <- plot.roc(svm_valid_sa_tk2$ketluan_hoichungdown, prediction_valid_svm_sa_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_svm_sa_tk2 <- pROC::roc(svm_valid_sa_tk2$ketluan_hoichungdown, prediction_valid_svm_sa_tk2[,1])
+coords_valid_svm_sa_tk2 <- coords(rp_valid_svm_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_svm_sa_tk2
+```
+
+```{r test sa_tk2 svm model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_svm_sa_tk2 <- predict(svm_sa_tk2, newdata = svm_test_sa_tk2, type = "prob")
+
+# Draw the ROC
+cf_svm_sa_tk2 <- plot.roc(svm_test_sa_tk2$ketluan_hoichungdown, prediction_svm_sa_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_svm_sa_tk2 <- pROC::roc(svm_test_sa_tk2$ketluan_hoichungdown, prediction_svm_sa_tk2[,1])
+coords_svm_sa_tk2 <- coords(rp_svm_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_svm_sa_tk2
+```
+
+```{r sa_tk2 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sa_tk2 <- train(ketluan_hoichungdown~., data = train_sa_tk2, method = "rf", trControl = trainControl, tuneGrid = expand.grid(.mtry=5), ntree = 50, max_depth = 3, metric = "Accuracy")
+
+rf_sa_tk2
+```
+
+```{r validate sa_tk2 rf model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_rf_sa_tk2 <- predict(rf_sa_tk2, newdata = valid_sa_tk2, type = "prob")
+
+# Draw the ROC
+cf_valid_rf_sa_tk2 <- plot.roc(valid_sa_tk2$ketluan_hoichungdown, prediction_valid_rf_sa_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_rf_sa_tk2 <- pROC::roc(valid_sa_tk2$ketluan_hoichungdown, prediction_valid_rf_sa_tk2[,1])
+coords_valid_rf_sa_tk2 <- coords(rp_valid_rf_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_rf_sa_tk2
+```
+
+```{r test sa_tk2 rf model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_rf_sa_tk2 <- predict(rf_sa_tk2, newdata = test_sa_tk2, type = "prob")
+
+# Draw the ROC
+cf_rf_sa_tk2 <- plot.roc(test_sa_tk2$ketluan_hoichungdown, prediction_rf_sa_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_rf_sa_tk2 <- pROC::roc(test_sa_tk2$ketluan_hoichungdown, prediction_rf_sa_tk2[,1])
+coords_rf_sa_tk2 <- coords(rp_rf_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_rf_sa_tk2
+```
+
+```{r sa_tk2 xgb model, include=FALSE}
+tune_grid <- expand.grid(
+  nrounds = c(200),
+  min_child_weight = c(5),
+  gamma = c(0),
+  subsample = c(1),
+  colsample_bytree = c(0.6),
+  max_depth = c(7),
+  eta = c(0.1)
+)
+
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sa_tk2 <- train(ketluan_hoichungdown~., data = train_sa_tk2, method = "xgbTree", trControl = trainControl, tuneGrid = tune_grid, metric = "Accuracy", verbosity = 0)
+
+xgb_sa_tk2
+```
+
+```{r validate sa_tk2 xgb model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_xgb_sa_tk2 <- predict(xgb_sa_tk2, newdata = valid_sa_tk2, type = "prob")
+
+# Draw the ROC
+cf_valid_xgb_sa_tk2 <- plot.roc(valid_sa_tk2$ketluan_hoichungdown, prediction_valid_xgb_sa_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_xgb_sa_tk2 <- pROC::roc(valid_sa_tk2$ketluan_hoichungdown, prediction_valid_xgb_sa_tk2[,1])
+coords_valid_xgb_sa_tk2 <- coords(rp_valid_xgb_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_xgb_sa_tk2
+```
+
+```{r test sa_tk2 xgb model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_xgb_sa_tk2 <- predict(xgb_sa_tk2, newdata = test_sa_tk2, type = "prob")
+
+# Draw the ROC
+cf_xgb_sa_tk2 <- plot.roc(test_sa_tk2$ketluan_hoichungdown, prediction_xgb_sa_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_xgb_sa_tk2 <- pROC::roc(test_sa_tk2$ketluan_hoichungdown, prediction_xgb_sa_tk2[,1])
+coords_xgb_sa_tk2 <- coords(rp_xgb_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_xgb_sa_tk2
+```
+
+```{r sh_tk2, include=FALSE}
+# Get ultrasound trimester 1 ultrasound data
+sh_tk2 <- data %>%
+  filter(sieuamkythun == 2,
+         !is.na(t_mom_afp),
+         !is.na(t_mom_hcg),
+         !is.na(t_mom_ue3),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(dulieu_kiemdinh,
+         t_mom_afp,
+         t_mom_hcg,
+         t_mom_ue3,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 2 biochemical data, include=FALSE}
+# Get the dataset without dependent variable ketluan_hoichungdown
+sh_tk2_impute_model_data <- sh_tk2[, !(colnames(sh_tk2) == "ketluan_hoichungdown")]
+
+ignore <- sh_tk2_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the dataset
+sh_tk2_imputed <- mice(sh_tk2_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sh_tk2_impute_model_data)
+
+# Impute missing values in testing set
+sh_tk2_imputed <- complete(sh_tk2_imputed)
+
+sh_tk2_imputed <- cbind(sh_tk2_imputed, sh_tk2[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sh_tk2, include=FALSE}
+# Get ultrasound semeter 1 training data
+train_valid_sh_tk2 <- sh_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(t_mom_afp,
+         t_mom_hcg,
+         t_mom_ue3,
+         ketluan_hoichungdown)
+```
+
+```{r valid_sh_tk2, include=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(train_valid_sh_tk2$ketluan_hoichungdown, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train_sh_tk2 <- train_valid_sh_tk2[ trainIndex,]
+valid_sh_tk2 <- train_valid_sh_tk2[-trainIndex,]
+```
+
+```{r test_sh_tk2, include=FALSE}
+# Get ultrasound trimester 1 testing data
+test_sh_tk2 <- sh_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(t_mom_afp,
+         t_mom_hcg,
+         t_mom_ue3,
+         ketluan_hoichungdown)
+```
+
+```{r smote_train_sh_tk2, include=FALSE}
+# Perform SMOTENC oversampling method
+set.seed(123)
+train_sh_tk2$ketluan_hoichungdown = as.factor(train_sh_tk2$ketluan_hoichungdown)
+smote_train_sh_tk2 <- smotenc(train_sh_tk2, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+```
+
+```{r sh_tk2 preprocessing, include=FALSE}
+prepro_knn_sh_tk2 <- preProcess(train_sh_tk2, method = c("center", "scale"))
+knn_train_sh_tk2 <- predict(prepro_knn_sh_tk2, smote_train_sh_tk2)
+knn_valid_sh_tk2 <- predict(prepro_knn_sh_tk2, valid_sh_tk2)
+knn_test_sh_tk2 <- predict(prepro_knn_sh_tk2, test_sh_tk2)
+
+prepro_svm_sh_tk2 <- preProcess(train_sh_tk2, method = c("center", "scale"))
+svm_train_sh_tk2 <- predict(prepro_svm_sh_tk2, smote_train_sh_tk2)
+svm_valid_sh_tk2 <- predict(prepro_svm_sh_tk2, valid_sh_tk2)
+svm_test_sh_tk2 <- predict(prepro_svm_sh_tk2, test_sh_tk2)
+```
+
+```{r sh_tk2 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sh_tk2 <- train(ketluan_hoichungdown~., data=knn_train_sh_tk2, method="knn", trControl=trainControl, tuneGrid = data.frame(k = 59), metric = "Accuracy")
+
+knn_sh_tk2
+```
+
+```{r validate sh_tk2 knn model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_knn_sh_tk2 <- predict(knn_sh_tk2, newdata = knn_valid_sh_tk2, type = "prob")
+
+# Draw the ROC
+cf_valid_knn_sh_tk2 <- plot.roc(knn_valid_sh_tk2$ketluan_hoichungdown, prediction_valid_knn_sh_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_knn_sh_tk2 <- pROC::roc(knn_valid_sh_tk2$ketluan_hoichungdown, prediction_valid_knn_sh_tk2[,1])
+coords_valid_knn_sh_tk2 <- coords(rp_valid_knn_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_knn_sh_tk2
+```
+
+```{r test sh_tk2 knn model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_knn_sh_tk2 <- predict(knn_sh_tk2, newdata = knn_test_sh_tk2, type = "prob")
+
+# Draw the ROC
+cf_knn_sh_tk2 <- plot.roc(knn_test_sh_tk2$ketluan_hoichungdown, prediction_knn_sh_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_knn_sh_tk2 <- pROC::roc(knn_test_sh_tk2$ketluan_hoichungdown, prediction_knn_sh_tk2[,1])
+coords_knn_sh_tk2 <- coords(rp_knn_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_knn_sh_tk2
+```
+
+```{r sh_tk2 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sh_tk2 <- train(ketluan_hoichungdown~., data = svm_train_sh_tk2, method = "svmLinear", trControl = trainControl, tuneGrid = expand.grid(C = 0.4), metric = "Accuracy")
+
+svm_sh_tk2
+```
+
+```{r validate sh_tk2 svm model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_svm_sh_tk2 <- predict(svm_sh_tk2, newdata = svm_valid_sh_tk2, type = "prob")
+
+# Draw the ROC
+cf_valid_svm_sh_tk2 <- plot.roc(svm_valid_sh_tk2$ketluan_hoichungdown, prediction_valid_svm_sh_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_svm_sh_tk2 <- pROC::roc(svm_valid_sh_tk2$ketluan_hoichungdown, prediction_valid_svm_sh_tk2[,1])
+coords_valid_svm_sh_tk2 <- coords(rp_valid_svm_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_svm_sh_tk2
+```
+
+```{r test sh_tk2 svm model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_svm_sh_tk2 <- predict(svm_sh_tk2, newdata = svm_test_sh_tk2, type = "prob")
+
+# Draw the ROC
+cf_svm_sh_tk2 <- plot.roc(svm_test_sh_tk2$ketluan_hoichungdown, prediction_svm_sh_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_svm_sh_tk2 <- pROC::roc(svm_test_sh_tk2$ketluan_hoichungdown, prediction_svm_sh_tk2[,1])
+coords_svm_sh_tk2 <- coords(rp_svm_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_svm_sh_tk2
+```
+
+```{r sh_tk2 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sh_tk2 <- train(ketluan_hoichungdown~., data = train_sh_tk2, method = "rf", trControl = trainControl, tuneGrid = expand.grid(.mtry=1), ntree = 50, max_depth = 3, metric = "Accuracy")
+
+rf_sh_tk2
+```
+
+```{r validate sh_tk2 rf model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_rf_sh_tk2 <- predict(rf_sh_tk2, newdata = valid_sh_tk2, type = "prob")
+
+# Draw the ROC
+cf_valid_rf_sh_tk2 <- plot.roc(valid_sh_tk2$ketluan_hoichungdown, prediction_valid_rf_sh_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_rf_sh_tk2 <- pROC::roc(valid_sh_tk2$ketluan_hoichungdown, prediction_valid_rf_sh_tk2[,1])
+coords_valid_rf_sh_tk2 <- coords(rp_valid_rf_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_rf_sh_tk2
+```
+
+```{r test sh_tk2 rf model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_rf_sh_tk2 <- predict(rf_sh_tk2, newdata = test_sh_tk2, type = "prob")
+
+# Draw the ROC
+cf_rf_sh_tk2 <- plot.roc(test_sh_tk2$ketluan_hoichungdown, prediction_rf_sh_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_rf_sh_tk2 <- pROC::roc(test_sh_tk2$ketluan_hoichungdown, prediction_rf_sh_tk2[,1])
+coords_rf_sh_tk2 <- coords(rp_rf_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_rf_sh_tk2
+```
+
+```{r sh_tk2 xgb model, include=FALSE}
+tune_grid <- expand.grid(
+  nrounds = c(100),
+  min_child_weight = c(1),
+  gamma = c(0),
+  subsample = c(0.8),
+  colsample_bytree = c(1),
+  max_depth = c(5),
+  eta = c(0.01)
+)
+
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sh_tk2 <- train(ketluan_hoichungdown~., data = train_sh_tk2, method = "xgbTree", trControl = trainControl, tuneGrid = tune_grid, metric = "Accuracy", verbosity = 0)
+
+xgb_sh_tk2
+```
+
+```{r validate sh_tk2 xgb model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_xgb_sh_tk2 <- predict(xgb_sh_tk2, newdata = valid_sh_tk2, type = "prob")
+
+# Draw the ROC
+cf_valid_xgb_sh_tk2 <- plot.roc(valid_sh_tk2$ketluan_hoichungdown, prediction_valid_xgb_sh_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_xgb_sh_tk2 <- pROC::roc(valid_sh_tk2$ketluan_hoichungdown, prediction_valid_xgb_sh_tk2[,1])
+coords_valid_xgb_sh_tk2 <- coords(rp_valid_xgb_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_xgb_sh_tk2
+```
+
+```{r test sh_tk2 xgb model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_xgb_sh_tk2 <- predict(xgb_sh_tk2, newdata = test_sh_tk2, type = "prob")
+
+# Draw the ROC
+cf_xgb_sh_tk2 <- plot.roc(test_sh_tk2$ketluan_hoichungdown, prediction_xgb_sh_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_xgb_sh_tk2 <- pROC::roc(test_sh_tk2$ketluan_hoichungdown, prediction_xgb_sh_tk2[,1])
+coords_xgb_sh_tk2 <- coords(rp_xgb_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_xgb_sh_tk2
+```
+
+```{r sash_tk2, include=FALSE}
+# Get ultrasound trimester 2 ultrasound and biochemical data
+sash_tk2 <- data %>%
+  filter(sieuamkythun == 2,
+         !is.na(tuoime),
+         !is.na(tuoithai),
+         !is.na(tiensusinhconhoichungdown),
+         !is.na(dau_duongkinhluongdinh),
+         !is.na(dau_chuvidau),
+         # !is.na(dau_naothatben),
+         # !is.na(mat_khoangcach2homat),
+         # !is.na(mat_xuongsongmui),
+         !is.na(mat_moimui),
+         !is.na(nguc_nhiptimthai),
+         !is.na(nguc_ditattim),
+         !is.na(t_mom_ue3),
+         !is.na(t_mom_afp),
+         !is.na(t_mom_hcg),
+         !is.na(chi_chieudaixuongdui),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(dulieu_kiemdinh,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         mat_moimui,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         t_mom_ue3,
+         t_mom_afp,
+         t_mom_hcg,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 2 ultrasound and biochemical data, include=FALSE}
+# Get the dataset without dependent variable ketluan_hoichungdown
+sash_tk2_impute_model_data <- sash_tk2[, !(colnames(sash_tk2) == "ketluan_hoichungdown")]
+
+ignore <- sash_tk2_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the dataset
+sash_tk2_imputed <- mice(sash_tk2_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sash_tk2_impute_model_data)
+
+# Impute missing values in testing set
+sash_tk2_imputed <- complete(sash_tk2_imputed)
+
+sash_tk2_imputed <- cbind(sash_tk2_imputed, sash_tk2[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sash_tk2, include=FALSE}
+# Get ultrasound and biochemical semeter 2 training data
+train_valid_sash_tk2 <- sash_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         mat_moimui,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         t_mom_ue3,
+         t_mom_afp,
+         t_mom_hcg,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r valid_sash_tk2, include=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(train_valid_sash_tk2$ketluan_hoichungdown, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train_sash_tk2 <- train_valid_sash_tk2[ trainIndex,]
+valid_sash_tk2 <- train_valid_sash_tk2[-trainIndex,]
+```
+
+```{r test_sash_tk2, include=FALSE}
+# Get ultrasound and biochemical semeter 2 testing data
+test_sash_tk2 <- sash_tk2 %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         mat_moimui,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         t_mom_ue3,
+         t_mom_afp,
+         t_mom_hcg,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r smote_sash_tk2, include=FALSE}
+# Perform SMOTE oversampling method
+set.seed(123)
+train_sash_tk2$ketluan_hoichungdown = as.factor(train_sash_tk2$ketluan_hoichungdown)
+smote_train_sash_tk2 <- smotenc(train_sash_tk2, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+```
+
+```{r sash_tk2 preprocessing, include=FALSE}
+prepro_knn_sash_tk2 <- preProcess(train_sash_tk2, method = c("center", "scale"))
+knn_train_sash_tk2 <- predict(prepro_knn_sash_tk2, smote_train_sash_tk2)
+knn_valid_sash_tk2 <- predict(prepro_knn_sash_tk2, valid_sash_tk2)
+knn_test_sash_tk2 <- predict(prepro_knn_sash_tk2, test_sash_tk2)
+
+prepro_svm_sash_tk2 <- preProcess(train_sash_tk2, method = c("center", "scale"))
+svm_train_sash_tk2 <- predict(prepro_svm_sash_tk2, smote_train_sash_tk2)
+svm_valid_sash_tk2 <- predict(prepro_svm_sash_tk2, valid_sash_tk2)
+svm_test_sash_tk2 <- predict(prepro_svm_sash_tk2, test_sash_tk2)
+```
+
+```{r sash_tk2 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sash_tk2 <- train(ketluan_hoichungdown~., data=knn_train_sash_tk2, method="knn", trControl=trainControl, tuneGrid = data.frame(k = 169), metric = "Accuracy")
+
+knn_sash_tk2
+```
+
+```{r validate sash_tk2 knn model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_knn_sash_tk2 <- predict(knn_sash_tk2, newdata = knn_valid_sash_tk2, type = "prob")
+
+# Draw the ROC
+cf_valid_knn_sash_tk2 <- plot.roc(knn_valid_sash_tk2$ketluan_hoichungdown, prediction_valid_knn_sash_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_knn_sash_tk2 <- pROC::roc(knn_valid_sash_tk2$ketluan_hoichungdown, prediction_valid_knn_sash_tk2[,1])
+coords_valid_knn_sash_tk2 <- coords(rp_valid_knn_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_knn_sash_tk2
+```
+
+```{r test sash_tk2 knn model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_knn_sash_tk2 <- predict(knn_sash_tk2, newdata = knn_test_sash_tk2, type = "prob")
+
+# Draw the ROC
+cf_knn_sash_tk2 <- plot.roc(knn_test_sash_tk2$ketluan_hoichungdown, prediction_knn_sash_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_knn_sash_tk2 <- pROC::roc(knn_test_sash_tk2$ketluan_hoichungdown, prediction_knn_sash_tk2[,1])
+coords_knn_sash_tk2 <- coords(rp_knn_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_knn_sash_tk2
+```
+
+```{r sash_tk2 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sash_tk2 <- train(ketluan_hoichungdown~., data = svm_train_sash_tk2, method = "svmLinear", trControl = trainControl, tuneGrid = data.frame(C = 0.01), metric = "Accuracy")
+
+svm_sash_tk2
+```
+
+```{r validate sash_tk2 svm model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_svm_sash_tk2 <- predict(svm_sash_tk2, newdata = svm_valid_sash_tk2, type = "prob")
+
+# Draw the ROC
+cf_valid_svm_sash_tk2 <- plot.roc(svm_valid_sash_tk2$ketluan_hoichungdown, prediction_valid_svm_sash_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_svm_sash_tk2 <- pROC::roc(svm_valid_sash_tk2$ketluan_hoichungdown, prediction_valid_svm_sash_tk2[,1])
+coords_valid_svm_sash_tk2 <- coords(rp_valid_svm_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_svm_sash_tk2
+```
+
+```{r test sash_tk2 svm model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_svm_sash_tk2 <- predict(svm_sash_tk2, newdata = svm_test_sash_tk2, type = "prob")
+
+# Draw the ROC
+cf_svm_sash_tk2 <- plot.roc(svm_test_sash_tk2$ketluan_hoichungdown, prediction_svm_sash_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_svm_sash_tk2 <- pROC::roc(svm_test_sash_tk2$ketluan_hoichungdown, prediction_svm_sash_tk2[,1])
+coords_svm_sash_tk2 <- coords(rp_svm_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_svm_sash_tk2
+```
+
+```{r sash_tk2 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sash_tk2 <- train(ketluan_hoichungdown~., data = train_sash_tk2, method = "rf", trControl = trainControl, tuneGrid = expand.grid(.mtry=7), ntree = 200, max_depth = 3, metric = "Accuracy")
+
+rf_sash_tk2
+```
+
+```{r validate sash_tk2 rf model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_rf_sash_tk2 <- predict(rf_sash_tk2, newdata = valid_sash_tk2, type = "prob")
+
+# Draw the ROC
+cf_valid_rf_sash_tk2 <- plot.roc(valid_sash_tk2$ketluan_hoichungdown, prediction_valid_rf_sash_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_rf_sash_tk2 <- pROC::roc(valid_sash_tk2$ketluan_hoichungdown, prediction_valid_rf_sash_tk2[,1])
+coords_valid_rf_sash_tk2 <- coords(rp_valid_rf_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_rf_sash_tk2
+```
+
+```{r test sash_tk2 rf model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_rf_sash_tk2 <- predict(rf_sash_tk2, newdata = test_sash_tk2, type = "prob")
+
+# Draw the ROC
+cf_rf_sash_tk2 <- plot.roc(test_sash_tk2$ketluan_hoichungdown, prediction_rf_sash_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_rf_sash_tk2 <- pROC::roc(test_sash_tk2$ketluan_hoichungdown, prediction_rf_sash_tk2[,1])
+coords_rf_sash_tk2 <- coords(rp_rf_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_rf_sash_tk2
+```
+
+```{r sash_tk2 xgb model, include=FALSE}
+tune_grid <- expand.grid(
+  nrounds = c(50),
+  eta = c(0.1),
+  max_depth = c(3),
+  gamma = c(0),
+  colsample_bytree = c(0.6),
+  min_child_weight = c(1),
+  subsample = c(1)
+)
+
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sash_tk2 <- train(ketluan_hoichungdown~., data = train_sash_tk2, method = "xgbTree", trControl = trainControl, tuneGrid = tune_grid, metric = "Accuracy", verbosity = 0)
+
+xgb_sash_tk2
+```
+
+```{r validate sash_tk2 xgb model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_valid_xgb_sash_tk2 <- predict(xgb_sash_tk2, newdata = valid_sash_tk2, type = "prob")
+
+# Draw the ROC
+cf_valid_xgb_sash_tk2 <- plot.roc(valid_sash_tk2$ketluan_hoichungdown, prediction_valid_xgb_sash_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_valid_xgb_sash_tk2 <- pROC::roc(valid_sash_tk2$ketluan_hoichungdown, prediction_valid_xgb_sash_tk2[,1])
+coords_valid_xgb_sash_tk2 <- coords(rp_valid_xgb_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_valid_xgb_sash_tk2
+```
+
+```{r test sash_tk2 xgb model, include=FALSE}
+# Test the model on test set
+set.seed(123)
+prediction_xgb_sash_tk2 <- predict(xgb_sash_tk2, newdata = test_sash_tk2, type = "prob")
+
+# Draw the ROC
+cf_xgb_sash_tk2 <- plot.roc(test_sash_tk2$ketluan_hoichungdown, prediction_xgb_sash_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_xgb_sash_tk2 <- pROC::roc(test_sash_tk2$ketluan_hoichungdown, prediction_xgb_sash_tk2[,1])
+coords_xgb_sash_tk2 <- coords(rp_xgb_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+
+coords_xgb_sash_tk2
+```
+
+```{r tk, include=FALSE}
+tk1 <- data %>%
+  filter(sieuamkythun == 1,
+         dulieu_kiemdinh == 0,
+         !is.na(ketluan_hoichungdown)) %>%
+  select(sieuamkythun,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+
+tk2 <- data %>%
+  filter(sieuamkythun == 2,
+         dulieu_kiemdinh == 0,
+         !is.na(ketluan_hoichungdown)) %>%
+  select(sieuamkythun,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         mat_moimui,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         t_mom_ue3,
+         t_mom_afp,
+         t_mom_hcg,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+
+tk <- bind_rows(tk1, tk2)
+```
+
+\pagenumbering{arabic}
+
+\setlength{\parindent}{40pt}
+
+\setcounter{tocdepth}{5}
+
+# **Introduction** {-}
+
+\pagenumbering{arabic}
+
+Down syndrome (DS) is a congenital defect caused by an extra 21\textsuperscript{st} chromosome.[@cdcFactsSyndromeCDC2021]
+This is the most common chromosomal disorder in the US that appears in 1 in every 700 babies and approximately 250,700 people were living with Down syndrome in the US in 2008.[@pressonCurrentEstimateSyndrome2013]
+There are no official reports on the prevalence of Down Syndrome in Vietnam.
+However, according to a study conducted in Da Nang on 14,335 live births from April 2015 to March 2016, this prevalence was 13.95 per 10,000. [@giangPrevalencePatternCongenital2019]
+Children with Down syndrome have a higher risk of congenital heart disease, deafness, ear infections, lung infections and autism leading to high mortality rates and reduced life expectancy.[@parkSyndromeCongenitalHeart1977, @roizenHearingLossChildren1993, @shottHearingLossChildren2001, @ramInfectionsImmunodeficiencySyndrome2011, @reillyAutismSpectrumDisorders2009]
+
+Currently, there are 3 methods of screening for Down syndrome in Vietnam: Non-Invasive Prenatal Testing (NIPT) based on chromosomal information from fetus’s DNA in the mother’s peripheral blood, the double biochemical test based on PAPP-A (Pregnancy Associated Plasma Protein A) and Free Beta-hCG in trimester 1, and the triple biochemical test which is based on  AFP (Alpha Fetoprotein), hCG (Human Chorionic Gonadotropin) and uE3 (unconjugated Estriol) in trimester 2.
+Among them, NIPT has the highest sensitivity and specificity, both approaching 99%.[@mersyAdvantagesDisadvantagesDifferent2015]
+However, NIPT is more expensive than other screening methods (ranging from 3 to 6 million Vietnamese Dong) to be adopted as a universal screening program.
+The double test in trimester 1 and the triple test in trimester 2 have lower sensitivity and specificity, ranging from 50%-60% sensitivity and 85-90% specificity, and are being used widely due to their lower costs, about 400-500 thousand Vietnamese Dong, which is about 1/6 the cost of NIPT.[@schiottConsecutiveCombinedTest2006] Therefore, it would be ideal to develop a method that combines high sensitivity and specificity with a relatively lower cost, making it a viable candidate for inclusion in a universal screening program.
+
+In recent years, the expansion of artificial intelligence (AI) to efficiently build decision support systems has led to new approaches to the early detection of Down syndrome.[@shailajaMachineLearningHealthcare2018]
+Machine learning is an important part of AI, and it gives computer systems the ability to learn automatically.
+Well-developed machine learning models have achieved sensitivities greater than 95% and higher with more data, higher than current double and triple testing methods currently being used in Vietnam.
+For example, Neocleous et al. developed a machine learning model that correctly identified all 129 cases of Down Syndrome in a total of 51,208 pregnancy cases.[@neocleousFirstTrimesterNoninvasive2016]
+Machine learning models can be implemented as a mobile app or a website, so prenatal screening using this method only requires a smart device that can access the software.
+Unlike NIPT, it is an inexpensive and easy-to-use method that can be used anywhere at any time.
+Therefore, this screening method could potentially be applied in the healthcare system in Vietnam, especially at the commune (community) level, where there are no trained specialists in genetics.
+This new method will help to increase the rate of pregnant women who can access the screening program and hopefully result in a reduced the frequency of undetected babies with Down syndrome.
+
+There has been limited research on the application of machine learning in screening for Down syndrome in Vietnam. Therefore, it's necessary to conduct a study to develop such a model. To accommodate real-life settings, where there might be limitations in infrastructure leading to incomplete test results, which is common in Vietnam, the study team constructed prediction models for Down Syndrome in first and second trimester using three distinct variable combinations. These combinations consisted of ultrasound test results exclusively, biochemical test results exclusively, or a combination of both ultrasound and biochemical test results. Subsequently, we conducted a comparative analysis to determine the most effective model, seeking to maximize both sensitivity and specificity while requiring the least amount of information.
+
+# **Method** {-}
+## **Data collection** {-}
+Data were collected from the medical records of pregnant women who visited the Vietnam National Hospital of Obstetrics and Gynecology from January 2012 to December 2022. Eligible participants were pregnant women who had either an ultrasound test results or prenatal screening test results (double or triple test). Amniocentesis test results were also required to serve as a gold diagnostic standard. Those with multiple pregnancies or IVF pregnancies were excluded due to their differences in ultrasound and biochemical test results compared to those without these conditions.
+
+A total of 16 variables were used to build machine learning models including two maternal characteristics: mother’s age, history of having children with Down Syndrome; two double test indices (MoM-hcgb and MoM-papp-a);  three triple test indices (MoM-ue3, MoM-afp and MoM-hcg);  nine ultrasound test indices (gestational age, fetal crown-rump length, biparietal diameter, fetal heart rate, head circumference, abnormal nose (yes; no), abnormal fetal heart (yes; no), and femur length).
+
+Ultrasound tests were conducted using Voluson E6 (GE, USA), Samsung HS60 (Samsung, Korea), and Samsung A80 (Samsung, Korea). Biochemical testing was done by Autodelfia (PerkinElmer, USA).
+
+## **Building machine learning models** {-}
+Four models were developed based on these approaches: K-nearest neighbor (KNN), Support Vector Machine (SVM), Random Forest (RF), and Extreme Gradient Boosting (XGBoost).
+All chosen algorithms are widely used and considered appropriate for classification problems.[@akinsolaSupervisedMachineLearning2017; @maglogiannisEmergingArtificialIntelligence2007]
+
+### **Machine learning models included** {-}
+- **K nearest neighbor (kNN)**: kNN algorithm, one of the simplest approaches, classifies observations into groups based on a “majority vote” of surrounding observations. The number of surrounding observations is determined by the value of k.
+
+- **Support vector machine (SVM)**: SVM algorithms construct a hyperplane where the distance between groups of data points is at its maximum. This hyperplane is known as the decision boundary, separating the groups of data points on either side of the plane.
+
+- **Random forest (RF)**: RF methods create multiple decision trees during a training phase. A final decision is based on the majority of the trees, and multiple independent decision trees are combined in parallel.
+
+- **Extreme Gradient Boosting (XGBoost)**: XGBoost methods create output in the form of decision trees like that described for RF approaches. However, XGBoost methods combine results from the decision trees sequentially so that each new tree corrects the error of the previous tree, in contrast to the parallel RF approach.
+
+Data were analyzed using Rstudio version 4.2.2.
+All machine learning models were built using caret package version 6.0-94.
+
+## **Data processing** {-}
+The initial dataset was split into six subsets based on two trimesters and three different diagnostic approaches (ultrasound testing alone, biochemical testing alone, or both).  Each of the four machine learning approaches was applied to each of the six data subsets, giving a total of 24 models to be trained and evaluated.
+
+Figure \ref{fig:data-overview} presents an overview of the datasets and how the initial dataset was broken down into sub-datasets to build the different models. Selected cases in each dataset had all the corresponding variables. For example, each case in the trimester 1 biochemical dataset did not have missing data in any of the variables of nuchal translucency, β-hCG or PAPP-A. Each of these six datasets was divided into training sets for model training, and a validation set for model validation.
+
+```{r data overview, echo=FALSE, fig.align="center", fig.cap="\\label{fig:data-overview}Overview of data subsets constructed for testing and validation, Vietnam National Hospital of Obstetrics and Gynecology, 2012 - 2022", fig.height=16, fig.width=12}
+# Make boxes
+overview_valid_sh_tk1 <- boxGrob(glue("Trimester 1", "biochemical validating data",
+                                     "Down: n = {a}",
+                                     "Not Down: n = {b}",
+                                     a = table(valid_sh_tk1$ketluan_hoichungdown)["Yes"],
+                                     b = table(valid_sh_tk1$ketluan_hoichungdown)["No"],
+                                     .sep = "\n",
+                                     # width=unit(2, "cm")
+                                     ),
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_data <- boxGrob(glue("Total dataset included training and validating data",
+                              "Down: n = {a}",
+                              "Not Down: n = {b}",
+                              a = table(tk$ketluan_hoichungdown)["Yes"],
+                              b = table(tk$ketluan_hoichungdown)["No"],
+                              .sep = "\n",
+                              # width=unit(2, "cm"),
+                              x = 0.5,
+                              y = 1),
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_sa_tk1 <- boxGrob(glue("Trimester 1", " ultrasound data",
+                                "Down: n = {a}",
+                                "Not Down: n = {b}",
+                                a = table(train_valid_sa_tk1$ketluan_hoichungdown)["Yes"],
+                                b = table(train_valid_sa_tk1$ketluan_hoichungdown)["No"],
+                                .sep = "\n",
+                                # width=unit(2, "cm"),
+                                x = 0.8,
+                                y = 0.5),
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_train_sa_tk1 <- boxGrob(glue("Trimester 1", "ultrasound training data",
+                                      "Down: n = {a}",
+                                      "Not Down: n = {b}",
+                                      a = table(train_sa_tk1$ketluan_hoichungdown)["Yes"],
+                                      b = table(train_sa_tk1$ketluan_hoichungdown)["No"],
+                                      .sep = "\n",
+                                      # width=unit(2, "cm"),
+                                      ),
+                         width = overview_valid_sh_tk1$vp$width,
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_valid_sa_tk1 <- boxGrob(glue("Trimester 1", "ultrasound validating data",
+                                     "Down: n = {a}",
+                                     "Not Down: n = {b}",
+                                     a = table(valid_sa_tk1$ketluan_hoichungdown)["Yes"],
+                                     b = table(valid_sa_tk1$ketluan_hoichungdown)["No"],
+                                     .sep = "\n",
+                                     # width=unit(2, "cm"),
+                                     ),
+                         width = overview_valid_sh_tk1$vp$width,
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_sh_tk1 <- boxGrob(glue("Trimester 1", "biochemical data",
+                                "Down: n = {a}",
+                                "Not Down: n = {b}",
+                                a = table(train_valid_sh_tk1$ketluan_hoichungdown)["Yes"],
+                                b = table(train_valid_sh_tk1$ketluan_hoichungdown)["No"],
+                                .sep = "\n",
+                                # width=unit(2, "cm"),
+                                x = 0.8,
+                                y = 0.5),
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_train_sh_tk1 <- boxGrob(glue("Trimester 1", "biochemical training data",
+                                      "Down: n = {a}",
+                                      "Not Down: n = {b}",
+                                      a = table(train_sh_tk1$ketluan_hoichungdown)["Yes"],
+                                      b = table(train_sh_tk1$ketluan_hoichungdown)["No"],
+                                      .sep = "\n",
+                                      # width=unit(2, "cm"),
+                                      ),
+                         width = overview_valid_sh_tk1$vp$width,
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_sash_tk1 <- boxGrob(glue("Trimester 1", "ultrasound and biochemical data",
+                                  "Down: n = {a}",
+                                  "Not Down: n = {b}",
+                                  a = table(train_valid_sash_tk1$ketluan_hoichungdown)["Yes"],
+                                  b = table(train_valid_sash_tk1$ketluan_hoichungdown)["No"],
+                                  .sep = "\n",
+                                  # width=unit(2, "cm"),
+                                  x = 0.6,
+                                  y = 0.5),
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_train_sash_tk1 <- boxGrob(glue("Trimester 1", "combined training data",
+                                        "Down: n = {a}",
+                                        "Not Down: n = {b}",
+                                        a = table(train_sash_tk1$ketluan_hoichungdown)["Yes"],
+                                        b = table(train_sash_tk1$ketluan_hoichungdown)["No"],
+                                        .sep = "\n",
+                                        # width=unit(2, "cm"),
+                                        ),
+                         width = overview_valid_sh_tk1$vp$width,
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_valid_sash_tk1 <- boxGrob(glue("Trimester 1", "combined validating data",
+                                       "Down: n = {a}",
+                                       "Not Down: n = {b}",
+                                       a = table(valid_sash_tk1$ketluan_hoichungdown)["Yes"],
+                                       b = table(valid_sash_tk1$ketluan_hoichungdown)["No"],
+                                       .sep = "\n",
+                                       # width=unit(2, "cm"),
+                                       ),
+                         width = overview_valid_sh_tk1$vp$width,
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_sa_tk2 <- boxGrob(glue("Trimester 2", "ultrasound data",
+                                "Down: n = {a}",
+                                "Not Down: n = {b}",
+                                a = table(train_valid_sa_tk2$ketluan_hoichungdown)["Yes"],
+                                b = table(train_valid_sa_tk2$ketluan_hoichungdown)["No"],
+                                .sep = "\n",
+                                # width=unit(2, "cm"),
+                                x = 0.4,
+                                y = 0.5),
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_train_sa_tk2 <- boxGrob(glue("Trimester 2", "ultrasound training data",
+                                      "Down: n = {a}",
+                                      "Not Down: n = {b}",
+                                      a = table(train_sa_tk2$ketluan_hoichungdown)["Yes"],
+                                      b = table(train_sa_tk2$ketluan_hoichungdown)["No"],
+                                      .sep = "\n",
+                                      # width=unit(2, "cm"),
+                                      ),
+                         width = overview_valid_sh_tk1$vp$width,
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_valid_sa_tk2 <- boxGrob(glue("Trimester 2", "ultrasound validating data",
+                                     "Down: n = {a}",
+                                     "Not Down: n = {b}",
+                                     a = table(valid_sa_tk2$ketluan_hoichungdown)["Yes"],
+                                     b = table(valid_sa_tk2$ketluan_hoichungdown)["No"],
+                                     .sep = "\n",
+                                     # width=unit(2, "cm"),
+                                     ),
+                         width = overview_valid_sh_tk1$vp$width,
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_sh_tk2 <- boxGrob(glue("Trimester 2", "biochemical data",
+                                "Down: n = {a}",
+                                "Not Down: n = {b}",
+                                a = table(train_valid_sh_tk2$ketluan_hoichungdown)["Yes"],
+                                b = table(train_valid_sh_tk2$ketluan_hoichungdown)["No"],
+                                .sep = "\n",
+                                # width=unit(2, "cm"),
+                                x = 0.4,
+                                y = 0.5),
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_train_sh_tk2 <- boxGrob(glue("Trimester 2", "biochemical training data",
+                                      "Down: n = {a}",
+                                      "Not Down: n = {b}",
+                                      a = table(train_sh_tk2$ketluan_hoichungdown)["Yes"],
+                                      b = table(train_sh_tk2$ketluan_hoichungdown)["No"],
+                                      .sep = "\n",
+                                      # width=unit(2, "cm"),
+                                      ),
+                         width = overview_valid_sh_tk1$vp$width,
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_valid_sh_tk2 <- boxGrob(glue("Trimester 2", "biochemical validating data",
+                                     "Down: n = {a}",
+                                     "Not Down: n = {b}",
+                                     a = table(valid_sh_tk2$ketluan_hoichungdown)["Yes"],
+                                     b = table(valid_sh_tk2$ketluan_hoichungdown)["No"],
+                                     .sep = "\n",
+                                     # width=unit(2, "cm"),
+                                     ),
+                         width = overview_valid_sh_tk1$vp$width,
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_sash_tk2 <- boxGrob(glue("Trimester 2", "ultrasound and biochemical data",
+                                  "Down: n = {a}",
+                                  "Not Down: n = {b}",
+                                  a = table(train_valid_sash_tk2$ketluan_hoichungdown)["Yes"],
+                                  b = table(train_valid_sash_tk2$ketluan_hoichungdown)["No"],
+                                  .sep = "\n",
+                                  # width=unit(2, "cm"),
+                                  x = 0.2,
+                                  y = 0.5),
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_train_sash_tk2 <- boxGrob(glue("Trimester 2", "combined training data",
+                                        "Down: n = {a}",
+                                        "Not Down: n = {b}",
+                                        a = table(train_sash_tk2$ketluan_hoichungdown)["Yes"],
+                                        b = table(train_sash_tk2$ketluan_hoichungdown)["No"],
+                                        .sep = "\n",
+                                        # width=unit(2, "cm"),
+                                        ),
+                         width = overview_valid_sh_tk1$vp$width,
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+overview_valid_sash_tk2 <- boxGrob(glue("Trimester 2", "combined validating data",
+                                       "Down: n = {a}",
+                                       "Not Down: n = {b}",
+                                       a = table(valid_sash_tk2$ketluan_hoichungdown)["Yes"],
+                                       b = table(valid_sash_tk2$ketluan_hoichungdown)["No"],
+                                       .sep = "\n",
+                                       # width=unit(2, "cm"),
+                                       ),
+                         width = overview_valid_sh_tk1$vp$width,
+                                 txt_gp=grid::gpar(fontfamily="Times", fontsize=13),)
+
+# Draw the boxes
+grid.newpage()
+
+vert1 <- spreadHorizontal(overview_data = overview_data,
+                          grps1 = overview_sash_tk2,
+                          grps2 = overview_valid_sash_tk2)
+grps1 <- alignHorizontal(reference = vert1$grps1,
+                         overview_sa_tk1 = overview_sa_tk1,
+                         overview_sh_tk1 = overview_sh_tk1,
+                         overview_sash_tk1 = overview_sash_tk1,
+                         overview_sa_tk2 = overview_sa_tk2,
+                         overview_sh_tk2 = overview_sh_tk2,
+                         overview_sash_tk2 = overview_sash_tk2) %>%
+  spreadVertical()
+vert1$grps1 <- NULL
+grps2 <- alignHorizontal(reference = vert1$grps2,
+                         overview_train_sa_tk1 = overview_train_sa_tk1,
+                         overview_valid_sa_tk1 = overview_valid_sa_tk1,
+                         overview_train_sh_tk1 = overview_train_sh_tk1,
+                         overview_valid_sh_tk1 = overview_valid_sh_tk1,                         
+                         overview_train_sash_tk1 = overview_train_sash_tk1,
+                         overview_valid_sash_tk1 = overview_valid_sash_tk1,
+                         overview_train_sa_tk2 = overview_train_sa_tk2,
+                         overview_valid_sa_tk2 = overview_valid_sa_tk2,
+                         overview_train_sh_tk2 = overview_train_sh_tk2,
+                         overview_valid_sh_tk2 = overview_valid_sh_tk2,
+                         overview_train_sash_tk2 = overview_train_sash_tk2,
+                         overview_valid_sash_tk2 = overview_valid_sash_tk2) %>%
+  spreadVertical()
+vert1$grps2 <- NULL
+
+connectGrob(vert1$overview_data, grps1$overview_sa_tk1, type = "L")
+connectGrob(vert1$overview_data, grps1$overview_sh_tk1, type = "L")
+connectGrob(vert1$overview_data, grps1$overview_sash_tk1, type = "L")
+connectGrob(vert1$overview_data, grps1$overview_sa_tk2, type = "L")
+connectGrob(vert1$overview_data, grps1$overview_sh_tk2, type = "L")
+connectGrob(vert1$overview_data, grps1$overview_sash_tk2, type = "L")
+connectGrob(grps1$overview_sa_tk1, grps2$overview_train_sa_tk1, type = "L")
+connectGrob(grps1$overview_sa_tk1, grps2$overview_valid_sa_tk1, type = "L")
+connectGrob(grps1$overview_sh_tk1, grps2$overview_train_sh_tk1, type = "L")
+connectGrob(grps1$overview_sh_tk1, grps2$overview_valid_sh_tk1, type = "L")
+connectGrob(grps1$overview_sash_tk1, grps2$overview_train_sash_tk1, type = "L")
+connectGrob(grps1$overview_sash_tk1, grps2$overview_valid_sash_tk1, type = "L")
+connectGrob(grps1$overview_sa_tk2, grps2$overview_train_sa_tk2, type = "L")
+connectGrob(grps1$overview_sa_tk2, grps2$overview_valid_sa_tk2, type = "L")
+connectGrob(grps1$overview_sh_tk2, grps2$overview_train_sh_tk2, type = "L")
+connectGrob(grps1$overview_sh_tk2, grps2$overview_valid_sh_tk2, type = "L")
+connectGrob(grps1$overview_sash_tk2, grps2$overview_train_sash_tk2, type = "L")
+connectGrob(grps1$overview_sash_tk2, grps2$overview_valid_sash_tk2, type = "L")
+
+vert1
+grps1
+grps2
+```
+
+All six datasets were cleaned, centered, and scaled.  An oversampling method was used to balance between the number of Down Syndrome cases and the number of non- Down Syndrome cases before training kNN and SVM models. The RF and XGBoost models did not require pre-processing. Each model was trained using 10-fold cross-validation (90% of data) and then validated (10% of data). Then, each of the 24 models were tested using the validation set (Figure \ref{fig:detail process}).
+
+```{r detail process, echo=FALSE, fig.align="center", fig.cap="Training and evaluating machine learning models for each of six data subsets, Vietnam National Hospital of Obstetrics and Gynecology, 2012 - 2022", fig.height=8, fig.width=12}
+detail_process1 <- boxGrob(glue("Dataset for model training"),
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process2 <- boxGrob(glue("Data cleaning"),
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process5 <- boxGrob(glue("Train K-nearest neighbor model",
+                                "10-Fold CV",
+                                .sep = "\n"),
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process6 <- boxGrob(glue("Train Support Vector Machine model",
+                                "10-Fold CV",
+                                .sep = "\n"),
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process7 <- boxGrob(glue("Train Random Forest model",
+                                "10-Fold CV",
+                                .sep = "\n"),
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process8 <- boxGrob(glue("Train XGboost model",
+                                "10-Fold CV",
+                                .sep = "\n"),
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process9 <- boxGrob(glue("Evaluate model performance"),
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process10 <- boxGrob(glue("Evaluate model performance"),
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process11 <- boxGrob(glue("Evaluate model performance"),
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process12 <- boxGrob(glue("Evaluate model performance"),
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process4a <- boxGrob(glue("Data pre-processing:",
+                                 "Center and scale data",
+                                 "Oversampling",
+                                 .sep = "\n"),
+                            width = detail_process5$vp$width,
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process4b <- boxGrob(glue("Data pre-processing:",
+                                 "Center and scale data",
+                                 "Oversampling",
+                                 .sep = "\n"),
+                            width = detail_process12$vp$width,
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process4c <- boxGrob(glue("No pre-processing"),
+                            height = detail_process4a$vp$height,
+                            width = detail_process12$vp$width,
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+detail_process4d <- boxGrob(glue("No pre-processing"), 
+                            height = detail_process4a$vp$height,
+                            width = detail_process12$vp$width,
+                           txt_gp=grid::gpar(fontfamily="Times", fontsize=13))
+
+grid.newpage()
+vert <- spreadVertical(detail_process1 = detail_process1,
+                       detail_process2 = detail_process2,
+                       detail_process4a = detail_process4a,
+                       detail_process5 = detail_process5,
+                       detail_process9 = detail_process9)
+grps0 <- alignVertical(reference = vert$detail_process4a,
+                       detail_process4a = detail_process4a,
+                       detail_process4b = detail_process4b,
+                       detail_process4c = detail_process4c,
+                       detail_process4d = detail_process4d) %>%
+  spreadHorizontal()
+grps1 <- alignHorizontal(reference = grps0$detail_process4a,
+                        detail_process5 = detail_process5,
+                        detail_process9 = detail_process9) %>%
+  spreadVertical(.from = grps0$detail_process4a, .to = 0)
+grps2 <- alignHorizontal(reference = grps0$detail_process4b,
+                        detail_process6 = detail_process6,
+                        detail_process10 = detail_process10) %>%
+  spreadVertical(.from = grps0$detail_process4b, .to = 0)
+grps3 <- alignHorizontal(reference = grps0$detail_process4c,
+                        detail_process7 = detail_process7,
+                        detail_process11 = detail_process11) %>%
+  spreadVertical(.from = grps0$detail_process4c, .to = 0)
+grps4 <- alignHorizontal(reference = grps0$detail_process4d,
+                        detail_process8 = detail_process8,
+                        detail_process12 = detail_process12) %>%
+  spreadVertical(.from = grps0$detail_process4d, .to = 0)
+
+vert$detail_process4a <- NULL
+vert$detail_process5 <- NULL
+vert$detail_process9 <- NULL
+
+vert
+grps0
+grps1
+grps2
+grps3
+grps4
+
+connectGrob(vert$detail_process1, vert$detail_process2, type = "v")
+
+connectGrob(vert$detail_process2, grps0$detail_process4a, type = "v")
+connectGrob(vert$detail_process2, grps0$detail_process4b, type = "v")
+connectGrob(vert$detail_process2, grps0$detail_process4c, type = "v")
+connectGrob(vert$detail_process2, grps0$detail_process4d, type = "v")
+
+connectGrob(grps0$detail_process4a, grps1$detail_process5, type = "v")
+connectGrob(grps0$detail_process4b, grps2$detail_process6, type = "v")
+connectGrob(grps0$detail_process4c, grps3$detail_process7, type = "v")
+connectGrob(grps0$detail_process4d, grps4$detail_process8, type = "v")
+
+connectGrob(grps1$detail_process5, grps1$detail_process9, type = "v")
+connectGrob(grps2$detail_process6, grps2$detail_process10, type = "v")
+connectGrob(grps3$detail_process7, grps3$detail_process11, type = "v")
+connectGrob(grps4$detail_process8, grps4$detail_process12, type = "v")
+```
+
+### **Fine tuning models** {-}
+10-fold validation was chosen to search for the best hyper-parameters for all models. During this process, a grid search strategy was used with the goal of minimizing the difference in accuracy between testing and validating results, keeping both at the highest value to reduce overfitting while maintaining performance. The hyper-parameters used to fine-tune each model included:
+
+1. kNN: k is the number of nearest neighbors to consider when making a prediction or classification.
+
+2. SVM: C controls the penalty for margin violations, which are data points that fall on the wrong side of the decision boundary or within the margin.
+
+3. RF: 
+- mtry controls the number of features (variables or predictors) randomly selected as candidates for splitting at each tree node during the tree-growing process.
+- ntree is the number of trees in the model.
+- max_depth (depth) is the maximum depth of tree.
+
+4. XGBoost:
+- nrounds determines how many decision trees (weak learners) are sequentially added to the ensemble.
+- min_child_weight (mcw) controls the minimum sum of instance weight needed in a child.
+- subsample (ssp) controls the fraction of training data to be randomly sampled during each boosting round.
+- colsample_bytree (csb) determines the fraction of variables to be randomly sampled when building each tree.
+- max_depth (xgbdepth) sets the maximum depth of each tree in the ensemble.
+- eta (learning rate) controls the step size or learning rate used in the gradient boosting process.
+
+The appendix provides a detailed process for training these machine learning models with information on each parameter.
+
+## **Assessing sensitivity, and specificity of machine learning models** {-}
+The amniocentesis test served as the "gold standard" to diagnose Down Syndrome.
+The outcome was the probability of having Down Syndrome as predicted by the AI models; therefore, sensitivity (detection rate) and specificity (1 - false positive rate) were assessed across a range of thresholds and visualized using Receiver Operating Characteristic (ROC) curves.
+For this study, true positives (TP) and true negatives (TN) were the correct predictions for patients' Down syndrome status, while false positives (FP) and false negatives (FN) were erroneous Down Syndrome predictions.
+A false positive was characterized as the prediction of a pregnant woman carrying a Down Syndrome fetus when she was not, whereas a false negative was characterized as the prediction of a pregnant woman not carrying a Down Syndrome fetus when she actually was.
+The positive predictive value (PPV) and negative predictive value (NPV) of these models were also calculated.
+The cut-off point for each test result used to classify whether a case had high or low risk of having Down Syndrome was chosen based on sensitivity and specificity.
+An optimal cut-off was defined as the cut-point that had the highest sensitivity and highest specificity based on the Youden method of the pROC package version 1.18.0.
+
+## **Ethical issues** {-}
+This research was approved by the Institutional Review Board of the Vietnam National Hospital of Obstetrics and Gynecology, decision number 1042/CN-PSTW 24th December 2020.
+All data were entered into our web-based tool and stored there.
+Accounts to access the tool were provided to researchers on an as-needed basis.
+
+# **Results** {-}
+A total of 7076 pregnant women with the mean age of 31 were included in the study.
+Table 1 presents the characteristics of mothers and their fetuses according to the presence of Down syndrome. There were 1,035 pregnant women that had fetus with Down syndrome in both trimesters, 409 in trimester 1 and 626 in trimester 2. The mean age of pregnant women with Down Syndrome was 32.5 years, which was 1.8 years higher on average than those without a Down fetus. Fetuses with Down syndrome had a mean nuchal translucency thickness of 3.38, almost two times higher than the reference without Down Syndrome. Fetuses with Down syndrome also had lower mean PAPP-A, higher mean β-hCG in trimester 1, and higher mean AFP, lower mean uE3, and higher mean hCG in trimester 2. They also had shorter femurs than fetuses without Down Syndrome.
+
+In the validation process of trimester 1 (Table \ref{tab:tk1-model-valid}), the XGBoost model achieved the highest accuracy in all three datasets: 85% in ultrasound, 94% in biochemical, and 93% in the combined dataset. The XGBoost model based on only biochemical values showed equivalent accuracy with the XGBoost model based on the combined dataset. The random forest model had an accuracy of 94% for biochemical only testing.
+
+The highest accuracy in the trimester 2 validation process was achieved by the SVM model with a combined dataset, reaching 89% (Table \ref{tab:tk2-model-valid}). This was followed by XGBoost in the same dataset. In the biochemical dataset, XGBoost achieved the highest accuracy, while RF performed the best with the ultrasound dataset.
+
+# **Discussion** {-}
+## **Model accuracy** {-}
+In trimester 1, the best models built on the combined dataset and the biochemical-only dataset showed equivalent performance. The model based on the ultrasound-only dataset had the poorest performance, suggesting that ultrasound data may not be as important in trimester 1.  This suggests that the integration of biochemical data substantially enhances the accuracy of Down Syndrome screening during the early stages of pregnancy.
+
+The superiority of the combined dataset model became even more evident in trimester 2, where it far outperformed the other two models. This reinforces the notion that a multi-faceted approach, encompassing both ultrasound and biochemical data, provides the most reliable screening results as pregnancy progresses, depending upon the trimester.
+
+## **Comparison with current Down screening method** {-}
+An international systematic review based on 56 studies, that included 204,759 pregnancies, of which 2,113 were affected by Down in trimester 1, showed the sensitivity of the best Double test to be around 68% while the best specificity would be around 95%.[@alldredFirstTrimesterSerum2015] Another study conducted by the same group of authors that included 59 studies involving 341,261 pregnancies with 1,994 cases of Down Syndrome in trimester 2 demonstrated similar results with 60-70% sensitivity and 95% specificity.[@alldredSecondTrimesterSerum2012] Our best model had better performance, with 64% sensitivity and 94% specificity. Therefore, we concluded that our machine learning models had higher sensitivity and specificity than the current widely used Down screening methods, which are Double test and Triple test.
+
+In comparison with NIPT, none of our models achieved 99% sensitivity nor specificity. However, our proposed method is still an inexpensive one that can be used as a universal screening method that can be applied in healthcare facilities with the capacity to perform either ultrasound or biochemical tests.
+
+## **Application approach** {-}
+In this study, we wanted to build and find the best and most suitable machine learning models customized to different testing capacities encountered across a range of facility types. Resources vary across the healthcare system, with some facilities being able to perform either the ultrasound test or the biochemical tests and some being able to perform both. By making models for a range of testing capacities, we can expand the scope of this screening program and let more pregnant women be screened for Down syndrome and inform the decision about amniocentesis testing for a more definitive diagnosis. Machine learning models are inexpensive yet effective and could be applied in healthcare facilities which don’t have medical experts in prenatal screening.
+
+In screening for Down syndrome, sensitivity is as important as specificity. High sensitivity means that more cases can be detected through screening, while high specificity ensures that those classified as not having Down Syndrome really do not have the condition. In the case of high sensitivity, while having low specificity, more pregnant women will be classified as having a fetus with Down syndrome and require a confirmatory amniocentesis. This not only causes unnecessary psychological and financial impact for pregnant women and their families, but more importantly, it can also affect the fetus and the mother’s reproductive health. Although amniocentesis is a confirmatory test and the gold standard, it is an invasive test with complications such as miscarriage, rupture of membranes, and infection.[@cederholmMaternalComplicationsFollowing2003; @creasmanFetalComplicationsAmniocentesis1968] Thus, minimizing the number of pregnant women who undergo this test through ensuring high specificity is a requirement of Down screening methods. Based on these considerations, we choose the cut-off point with the highest accuracy to secure both high sensitivity and high specificity at the same time using the Youden method.
+
+The development of machine learning models using three distinct datasets - ultrasound only, biochemical only, and the combination of both - for Down Syndrome screening in both trimesters 1 and 2 presents a versatile and practical approach to address real-world healthcare scenarios. This approach is particularly relevant for healthcare facilities that may face limitations in conducting comprehensive screening tests, such as ultrasound or biochemical tests. By offering a choice of three models, each tailored to a specific dataset, this strategy allows healthcare providers to adapt their screening methods to match their available resources and patient needs effectively.
+
+While the utilization of a combined model incorporating both ultrasound and biochemical data in trimester 1 is ideal when there's sufficient data from both tests, the option of relying solely on a model constructed from first-trimester biochemical data remains viable. This becomes especially relevant in scenarios where the healthcare facility lacks the capability to conduct Down's screening ultrasounds or when a patient opts not to undergo ultrasound testing. The accuracy of this standalone biochemical model closely aligns with that of the combined dataset model, offering a flexible choice of screening services.
+In the second trimester, it's essential to perform both types of assessments due to the clear difference in accuracy between the model constructed from the combined dataset and the model built using two datasets. The models created from these two datasets could be used as a point of comparison for the current screening methods.
+
+In prenatal screening, early detection of problems with the fetus will lead to timely counseling, which is covered by health insurance. However, some pregnant women come to the clinic for their first prenatal examination in the second trimester for a variety of reasons. Therefore, a national screening system should cover both the first and second trimester.
+
+## **Strengths and limitations** {-}
+This research represents the pioneering initiative in Vietnam to develop machine learning prediction models for Down Syndrome screening. Furthermore, it boasts an extensive dataset comprising over 1,000 cases involving pregnant women carrying fetuses with Down Syndrome. Additionally, this study introduced a diverse array of machine learning models, each comprised of specific inputs required during different trimesters. This multifaceted approach not only enhances options for pregnant women but also bolsters the healthcare system's utility, making it a valuable contribution to both patients and medical professionals.
+
+Although the Vietnam National Hospital of Obstetrics and Gynecology is a major maternity hospital in the North with ethnic and regional diversity, the majority of cases were of the Kinh ethnic group and may not fully represent the entire Vietnamese population. Therefore, the initial machine learning models only “learned” from patients at a single site. In addition, some of the validation datasets had low numbers of Down Syndrome cases, limiting precision of the estimates and the ability to determine if observed difference were statistically significant.
+
+# **Conclusions** {-}
+For trimester 1, the accuracy of models based on combined testing or biochemical testing alone was more accurate than models based on ultrasound testing alone. For trimester 2, machine learning models based on combined ultrasound and biochemical testing produced higher accuracy than models based on either modality alone.
+
+The machine learning approach that produced the highest accuracy varied by trimester and type of testing. For Trimester 1, XGBoost models produced ≥ 93% accuracy for biochemical testing alone or combined testing. For trimester 2, support vector machine models produced 89% accuracy for combined testing. The k-nearest neighbor approaches had the lowest accuracy in all settings.
+
+Our findings suggest that screening for Down syndrome may be feasible in Vietnam using machine learning prediction algorithms based on currently available data and testing approaches in low-resource settings. However, these models should be applied at more hospitals to increase the generalizability and precision of the estimates and to refine the hyperparameter estimates before implementation. A range of model types should be tested, and hyperparameters should be regularly updated with new and increasingly extensive data.
+
+These models can be accessed via this [link](https://waltjer.shinyapps.io/AI_Down_Screen/).
+
+# **Tables and figures** {-}
+\setlength{\parindent}{0pt}
+\singlespacing
+Table 1: Characteristics of mother and fetus according to the presence of Down syndrome, Vietnam National Hospital of Obstetrics and Gynecology, 2012 - 2022
+```{r tk table, echo=FALSE, warning=FALSE}
+tk <- tk %>%
+  mutate(tuoime_cat = case_when(
+    tuoime >= 35 ~ 1,
+    tuoime < 35 ~ 2,
+    TRUE ~ NA_integer_  # Assign NA for other cases
+  ))
+
+tk$tuoime_cat <- factor(tk$tuoime_cat, levels = c(1, 2), labels = c("≥ 35", "< 35"))
+
+tk$tiensusinhconhoichungdown <- factor(tk$tiensusinhconhoichungdown, levels = c(0,1), labels = c("No", "Yes"))
+tk$mat_moimui <- factor(tk$mat_moimui, levels = c(0,1), labels = c("No", "Yes"))
+tk$ketluan_hoichungdown <- factor(tk$ketluan_hoichungdown, levels = c("No", "Yes"), labels = c("Not Down", "Down"))
+tk$nguc_ditattim <- factor(tk$nguc_ditattim, levels = c(0,1), labels = c("No", "Yes"))
+
+label(tk$tuoime) <- "Mother's age"
+label(tk$tuoime_cat) <- "Mother's age"
+label(tk$tuoithai) <- "Fetus's age"
+label(tk$tiensusinhconhoichungdown) <- "History of having children with Down syndrome"
+label(tk$chieudaidaumong) <- "Fetal crown-rump length"
+label(tk$dau_duongkinhluongdinh) <- "Biparietal diameter"
+label(tk$dau_chuvidau) <- "Head circumference"
+label(tk$mat_moimui) <- "Abnormal fetal nose"
+label(tk$nguc_nhiptimthai) <- "Fetal heart rate"
+label(tk$d_khoangsangsaugay) <- "Nuchal translucency"
+label(tk$d_mom_pappa) <- "PAPP-A"
+label(tk$d_mom_hcgb) <- "β-hCG"
+label(tk$nguc_ditattim) <- "Abnormal fetal heart"
+label(tk$chi_chieudaixuongdui) <- "Fetal femur length"
+label(tk$t_mom_afp) <- "AFP"
+label(tk$t_mom_hcg) <- "hCG"
+label(tk$t_mom_ue3) <- "uE3"
+
+units(tk$tuoime) <- "years"
+units(tk$tuoithai) <- "weeks"
+units(tk$chieudaidaumong) <- "mm"
+units(tk$dau_duongkinhluongdinh) <- "mm"
+units(tk$dau_chuvidau) <- "mm"
+units(tk$nguc_nhiptimthai) <- "beats per minute"
+units(tk$d_khoangsangsaugay) <- "mm"
+units(tk$d_mom_pappa) <- "MoM"
+units(tk$d_mom_hcgb) <- "MoM"
+units(tk$chi_chieudaixuongdui) <- "mm"
+units(tk$t_mom_afp) <- "MoM"
+units(tk$t_mom_hcg) <- "MoM"
+units(tk$t_mom_ue3) <- "MoM"
+
+table_tk <- table1(~ tuoime + tuoime_cat + tuoithai + tiensusinhconhoichungdown + chieudaidaumong + dau_duongkinhluongdinh + dau_chuvidau + mat_moimui + nguc_nhiptimthai + nguc_ditattim + d_khoangsangsaugay + d_mom_pappa + d_mom_hcgb + chi_chieudaixuongdui + t_mom_afp + t_mom_hcg + t_mom_ue3 | ketluan_hoichungdown, data=tk, render.missing=NULL, render.categorical = my.render.cat, render.continuous = my.render.cont)
+
+t1kable(table_tk, longtable = TRUE, booktabs = TRUE) |>
+  kable_styling(latex_options = c("HOLD_position", "scale_down"), position = "center")
+```
+
+\doublespacing
+\setlength{\parindent}{40pt}
+
+```{r model name, echo=FALSE}
+Model <- c("k-nearest neighbor", "Support Vector Machine", "Random Forest", "XGBoost")
+```
+
+```{r model_perform_valid_sa_tk1, echo=FALSE}
+model_perform_valid_sa_tk1 <- rbind(coords_valid_knn_sa_tk1,
+                                  coords_valid_svm_sa_tk1,
+                                  coords_valid_rf_sa_tk1,
+                                  coords_valid_xgb_sa_tk1)
+model_perform_valid_sa_tk1 <- cbind(Model, model_perform_valid_sa_tk1)
+row.names(model_perform_valid_sa_tk1) <- NULL
+```
+
+```{r model_perform_valid_sh_tk1, echo=FALSE}
+model_perform_valid_sh_tk1 <- rbind(coords_valid_knn_sh_tk1,
+                                  coords_valid_svm_sh_tk1,
+                                  coords_valid_rf_sh_tk1,
+                                  coords_valid_xgb_sh_tk1)
+model_perform_valid_sh_tk1 <- cbind(Model, model_perform_valid_sh_tk1)
+row.names(model_perform_valid_sh_tk1) <- NULL
+```
+
+```{r model_perform_valid_sash_tk1, echo=FALSE}
+model_perform_valid_sash_tk1 <- rbind(coords_valid_knn_sash_tk1,
+                                  coords_valid_svm_sash_tk1,
+                                  coords_valid_rf_sash_tk1,
+                                  coords_valid_xgb_sash_tk1)
+model_perform_valid_sash_tk1 <- cbind(Model, model_perform_valid_sash_tk1)
+row.names(model_perform_valid_sash_tk1) <- NULL
+```
+
+```{r model_perform_valid_tk1, echo=FALSE}
+model_perform_valid_tk1 <- rbind(model_perform_valid_sa_tk1,
+                           model_perform_valid_sh_tk1,
+                           model_perform_valid_sash_tk1)
+
+model_perform_valid_tk1 <- model_perform_valid_tk1 %>%
+  rename("Threshold" = "threshold",
+         "Specificity" = "specificity",
+         "Sensitivity" = "sensitivity",
+         "PPV" = "ppv",
+         "NPV" = "npv",
+         "Accuracy" = "accuracy",
+         "TP" = "tp",
+         "TN" = "tn",
+         "FP" = "fp",
+         "FN" = "fn")
+
+model_perform_valid_tk1 %>%
+  kbl(align = "lcccc", caption = "\\label{tab:tk1-model-valid}Model validation performance for trimester 1, Vietnam National Hospital of Obstetrics and Gynecology, 2012 - 2022", booktabs = TRUE, digits = 2) %>%
+  pack_rows("Ultrasound", 1, 4) %>%
+  pack_rows("Biochemical", 5, 8) %>%
+  pack_rows("Both ultrasound and biochemical", 9, 12) %>%
+  kable_styling(latex_options = c("HOLD_position", "scale_down", position = "center")) %>%
+  footnote(general = c("PPV = Positive predictive value, ", 
+           "NPV = Negative predictive value ", 
+           "TP = True positive, ", 
+           "TN = True negative, ", 
+           "FP = False positive, ", 
+           "FN = False negative"))
+```
+
+```{r model_perform_valid_sa_tk2, echo=FALSE}
+model_perform_valid_sa_tk2 <- rbind(coords_valid_knn_sa_tk2,
+                                  coords_valid_svm_sa_tk2,
+                                  coords_valid_rf_sa_tk2,
+                                  coords_valid_xgb_sa_tk2)
+model_perform_valid_sa_tk2 <- cbind(Model, model_perform_valid_sa_tk2)
+row.names(model_perform_valid_sa_tk2) <- NULL
+```
+
+```{r model_perform_valid_sh_tk2, echo=FALSE}
+model_perform_valid_sh_tk2 <- rbind(coords_valid_knn_sh_tk2,
+                                  coords_valid_svm_sh_tk2,
+                                  coords_valid_rf_sh_tk2,
+                                  coords_valid_xgb_sh_tk2)
+model_perform_valid_sh_tk2 <- cbind(Model, model_perform_valid_sh_tk2)
+row.names(model_perform_valid_sh_tk2) <- NULL
+```
+
+```{r model_perform_valid_sash_tk2, echo=FALSE}
+model_perform_valid_sash_tk2 <- rbind(coords_valid_knn_sash_tk2,
+                                  coords_valid_svm_sash_tk2,
+                                  coords_valid_rf_sash_tk2,
+                                  coords_valid_xgb_sash_tk2)
+model_perform_valid_sash_tk2 <- cbind(Model, model_perform_valid_sash_tk2)
+row.names(model_perform_valid_sash_tk2) <- NULL
+```
+
+```{r model_perform_valid_tk2, echo=FALSE}
+model_perform_valid_tk2 <- rbind(model_perform_valid_sa_tk2,
+                           model_perform_valid_sh_tk2,
+                           model_perform_valid_sash_tk2)
+
+model_perform_valid_tk2 <- model_perform_valid_tk2 %>%
+  rename("Threshold" = "threshold",
+         "Specificity" = "specificity",
+         "Sensitivity" = "sensitivity",
+         "PPV" = "ppv",
+         "NPV" = "npv",
+         "Accuracy" = "accuracy",
+         "TP" = "tp",
+         "TN" = "tn",
+         "FP" = "fp",
+         "FN" = "fn")
+
+model_perform_valid_tk2 %>%
+  kbl(align = "lcccc", caption = "\\label{tab:tk2-model-valid}Model validation performance for trimester 2, Vietnam National Hospital of Obstetrics and Gynecology, 2012 - 2022", booktabs = TRUE, digits = 2) %>%
+  pack_rows("Ultrasound", 1, 4) %>%
+  pack_rows("Biochemical", 5, 8) %>%
+  pack_rows("Both ultrasound and biochemical", 9, 12) %>%
+  kable_styling(latex_options = c("HOLD_position", "scale_down", position = "center")) %>%
+  footnote(general = c("PPV = Positive predictive value, ", 
+           "NPV = Negative predictive value ", 
+           "TP = True positive, ", 
+           "TN = True negative, ", 
+           "FP = False positive, ", 
+           "FN = False negative"))
+```
+
+# **Appendix** {-}
+\setcounter{table}{0}
+```{r hyperpra, echo=FALSE}
+options(scipen = 999, digits = 10)
+
+k <- c(knn_sa_tk1$result$k, knn_sh_tk1$result$k, knn_sash_tk1$result$k, knn_sa_tk2$result$k, knn_sh_tk2$result$k, knn_sash_tk2$result$k)
+C <- c(svm_sa_tk1$results$C, svm_sh_tk1$results$C, svm_sash_tk1$results$C, svm_sa_tk2$results$C, svm_sh_tk2$results$C, svm_sash_tk2$results$C)
+mtry <- c(rf_sa_tk1$results$mtry, rf_sh_tk1$results$mtry, rf_sash_tk1$results$mtry, rf_sa_tk2$results$mtry, rf_sh_tk2$results$mtry, rf_sash_tk2$results$mtry)
+ntree <- c(rf_sa_tk1$call$ntree, rf_sh_tk1$call$ntree, rf_sash_tk1$call$ntree, rf_sa_tk2$call$ntree, rf_sh_tk2$call$ntree, rf_sash_tk2$call$ntree)
+depth <- c(rf_sa_tk1$call$max_depth, rf_sa_tk1$call$max_depth, rf_sa_tk1$call$max_depth, rf_sa_tk2$call$max_depth, rf_sh_tk2$call$max_depth, rf_sash_tk2$call$max_depth)
+nrounds <- c(xgb_sa_tk1$bestTune$nrounds, xgb_sh_tk1$bestTune$nrounds, xgb_sash_tk1$bestTune$nrounds, xgb_sa_tk2$bestTune$nrounds, xgb_sh_tk2$bestTune$nrounds, xgb_sash_tk2$bestTune$nrounds)
+mcw <- c(xgb_sa_tk1$bestTune$min_child_weight, xgb_sh_tk1$bestTune$min_child_weight, xgb_sash_tk1$bestTune$min_child_weight, xgb_sa_tk2$bestTune$min_child_weight, xgb_sh_tk2$bestTune$min_child_weight, xgb_sash_tk2$bestTune$min_child_weight)
+ssp <- c(xgb_sa_tk1$bestTune$subsample, xgb_sh_tk1$bestTune$subsample, xgb_sash_tk1$bestTune$subsample, xgb_sa_tk2$bestTune$subsample, xgb_sh_tk2$bestTune$subsample, xgb_sash_tk2$bestTune$subsample)
+csb <- c(xgb_sa_tk1$bestTune$colsample_bytree, xgb_sh_tk1$bestTune$colsample_bytree, xgb_sash_tk1$bestTune$colsample_bytree, xgb_sa_tk2$bestTune$colsample_bytree, xgb_sh_tk2$bestTune$colsample_bytree, xgb_sash_tk2$bestTune$colsample_bytree)
+xgbdepth <- c(xgb_sa_tk1$bestTune$max_depth, xgb_sh_tk1$bestTune$max_depth, xgb_sash_tk1$bestTune$max_depth, xgb_sa_tk2$bestTune$max_depth, xgb_sh_tk2$bestTune$max_depth, xgb_sash_tk2$bestTune$max_depth)
+eta <- c(xgb_sa_tk1$bestTune$eta, xgb_sh_tk1$bestTune$eta, xgb_sash_tk1$bestTune$eta, xgb_sa_tk2$bestTune$eta, xgb_sh_tk2$bestTune$eta, xgb_sash_tk2$bestTune$eta)
+
+# New vectors for tk1
+tk1_ultrasound <- c(k[1], C[1], mtry[1], ntree[1], depth[1], nrounds[1], mcw[1], ssp[1], csb[1], xgbdepth[1], eta[1])
+tk1_biochemical <- c(k[2], C[2], mtry[2], ntree[2], depth[2], nrounds[2], mcw[2], ssp[2], csb[2], xgbdepth[2], eta[2])
+tk1_combined <- c(k[3], C[3], mtry[3], ntree[3], depth[3], nrounds[3], mcw[3], ssp[3], csb[3], xgbdepth[3], eta[3])
+
+# New vectors for tk2
+tk2_ultrasound <- c(k[4], C[4], mtry[4], ntree[4], depth[4], nrounds[4], mcw[4], ssp[4], csb[4], xgbdepth[4], eta[4])
+tk2_biochemical <- c(k[5], C[5], mtry[5], ntree[5], depth[5], nrounds[5], mcw[5], ssp[5], csb[5], xgbdepth[5], eta[5])
+tk2_combined <- c(k[6], C[6], mtry[6], ntree[6], depth[6], nrounds[6], mcw[6], ssp[6], csb[6], xgbdepth[6], eta[6])
+
+name_hyperpara <- c("Ultrasound", "Biochemical", "Combined")
+
+tk1_hyperpara <- rbind(tk1_ultrasound, tk1_biochemical, tk1_combined)
+
+row.names(tk1_hyperpara) <- name_hyperpara
+
+tk2_hyperpara <- rbind(tk2_ultrasound, tk2_biochemical, tk2_combined)
+
+row.names(tk2_hyperpara) <- name_hyperpara
+
+hyperpara <- rbind(tk1_hyperpara, tk2_hyperpara)
+
+hyperpara <- data.frame(k, C, mtry, ntree, depth, nrounds, mcw, ssp, csb, xgbdepth, eta)
+
+row.names(hyperpara) <- c("Ultrasound ", "Biochemical ", "Combined ", "Ultrasound", "Biochemical", "Combined")
+
+hyperpara %>%
+  kbl(align = "lcccccccccc", caption = "\\label{table:hyperpara}Hyper-parameters for each model, Vietnam National Hospital of Obstetrics and Gynecology, 2012 - 2022", booktabs = TRUE) %>%
+  pack_rows("Trimester 1", 1, 3) %>%
+  pack_rows("Trimester 2", 4, 6) %>%
+  add_header_above(c(" ", "kNN" = 1, "SVM" = 1, "RF" = 3, "XGBoost" = 6)) %>%
+  kable_styling(latex_options = c("HOLD_position", "scale_down"))
+```
+
+```{r model_perform_train_sa_tk1, echo=FALSE}
+model_perform_train_sa_tk1 <- rbind(knn_sa_tk1$results[which.max(knn_sa_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  svm_sa_tk1$results[which.max(svm_sa_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  rf_sa_tk1$results[which.max(rf_sa_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  xgb_sa_tk1$results[which.max(xgb_sa_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")])
+model_perform_train_sa_tk1 <- cbind(Model, model_perform_train_sa_tk1)
+row.names(model_perform_train_sa_tk1) <- NULL
+```
+
+```{r model_perform_train_sh_tk1, echo=FALSE}
+model_perform_train_sh_tk1 <- rbind(knn_sh_tk1$results[which.max(knn_sh_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  svm_sh_tk1$results[which.max(svm_sh_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  rf_sh_tk1$results[which.max(rf_sh_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  xgb_sh_tk1$results[which.max(xgb_sh_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")])
+model_perform_train_sh_tk1 <- cbind(Model, model_perform_train_sh_tk1)
+row.names(model_perform_train_sh_tk1) <- NULL
+```
+
+```{r model_perform_train_sash_tk1, echo=FALSE}
+model_perform_train_sash_tk1 <- rbind(knn_sash_tk1$results[which.max(knn_sash_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  svm_sash_tk1$results[which.max(svm_sash_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  rf_sash_tk1$results[which.max(rf_sash_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  xgb_sash_tk1$results[which.max(xgb_sash_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")])
+model_perform_train_sash_tk1 <- cbind(Model, model_perform_train_sash_tk1)
+row.names(model_perform_train_sash_tk1) <- NULL
+```
+
+```{r model_perform_train_sa_tk2, echo=FALSE}
+model_perform_train_sa_tk2 <- rbind(knn_sa_tk2$results[which.max(knn_sa_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  svm_sa_tk2$results[which.max(svm_sa_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  rf_sa_tk2$results[which.max(rf_sa_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  xgb_sa_tk2$results[which.max(xgb_sa_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")])
+model_perform_train_sa_tk2 <- cbind(Model, model_perform_train_sa_tk2)
+row.names(model_perform_train_sa_tk2) <- NULL
+```
+
+```{r model_perform_train_sh_tk2, echo=FALSE}
+model_perform_train_sh_tk2 <- rbind(knn_sh_tk2$results[which.max(knn_sh_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  svm_sh_tk2$results[which.max(svm_sh_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  rf_sh_tk2$results[which.max(rf_sh_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  xgb_sh_tk2$results[which.max(xgb_sh_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")])
+model_perform_train_sh_tk2 <- cbind(Model, model_perform_train_sh_tk2)
+row.names(model_perform_train_sh_tk2) <- NULL
+```
+
+```{r model_perform_train_sash_tk2, echo=FALSE}
+model_perform_train_sash_tk2 <- rbind(knn_sash_tk2$results[which.max(knn_sash_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  svm_sash_tk2$results[which.max(svm_sash_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  rf_sash_tk2$results[which.max(rf_sash_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  xgb_sash_tk2$results[which.max(xgb_sash_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")])
+model_perform_train_sash_tk2 <- cbind(Model, model_perform_train_sash_tk2)
+row.names(model_perform_train_sash_tk2) <- NULL
+```
+
+```{r model_perform_train_tk1, echo=FALSE}
+model_perform_train_tk1 <- rbind(model_perform_train_sa_tk1,
+                           model_perform_train_sh_tk1,
+                           model_perform_train_sash_tk1)
+model_perform_train_tk1 %>%
+  kbl(align = "lcccc", caption = "\\label{tab:tk1-model-train}Model training performance for trimester 1, Vietnam National Hospital of Obstetrics and Gynecology, 2012 - 2022", booktabs = TRUE, digits = 2) %>%
+  pack_rows("Ultrasound", 1, 4) %>%
+  pack_rows("Biochemical", 5, 8) %>%
+  pack_rows("Both ultrasound and biochemical", 9, 12) %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+```{r model_perform_train_tk2, echo=FALSE}
+model_perform_train_tk2 <- rbind(model_perform_train_sa_tk2,
+                           model_perform_train_sh_tk2,
+                           model_perform_train_sash_tk2)
+model_perform_train_tk2 %>%
+  kbl(align = "lcccc", caption = "\\label{tab:tk2-model-train}Model training performance for trimester 2, Vietnam National Hospital of Obstetrics and Gynecology, 2012 - 2022", booktabs = TRUE, digits = 2) %>%
+  pack_rows("Ultrasound", 1, 4) %>%
+  pack_rows("Biochemical", 5, 8) %>%
+  pack_rows("Both ultrasound and biochemical", 9, 12) %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+```{r}
+
+```
+
+# **References** {-}

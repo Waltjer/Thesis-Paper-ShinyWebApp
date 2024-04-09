@@ -1,0 +1,2627 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "")
+options(tinytex.verbose = TRUE)
+
+setwd("E:/K2meep/Final Project/Thesis/Code")
+
+library(bookdown)
+library(magick)
+library(tidyverse)
+library(data.table)
+library(kableExtra)
+library(Gmisc)
+library(readxl)
+library(dplyr)
+library(caret)
+library(DMwR)
+library(kernlab)
+library(randomForest)
+library(mlbench)
+library(e1071)
+library(mice)
+library(pROC)
+library(themis)
+library(glue)
+library(htmlTable)
+library(grid)
+library(magrittr)
+library(table1)
+library(MLmetrics)
+```
+
+```{r import data, include=FALSE}
+data <- read_excel("E:/K2meep/Final Project/Thesis/Data/tsts_08022023.xlsx")
+```
+
+```{r gen mom age, include=FALSE}
+data$tuoime <- as.numeric(format(data$ngaythuchien_thainhi, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$ngaythuchien_thaiphu, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$ngaythuchien_thaiphu, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$ngaythuchien_NST, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$ngaythuchien_NST, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$d_ngaythuchien, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$d_ngaythuchien, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$t_ngaythuchien, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$t_ngaythuchien, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$ngaythuchien_nipt, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$ngaythuchien_nipt, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$ngaythuchien_thala_thaiphu, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$ngaythuchien_thala_thaiphu, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+```
+
+```{r gen fetus age, include=FALSE}
+data$tuoithai_ngay[data$tuoithai_ngay > 6] <- NA
+data$tuoithai_ngay[is.na(data$tuoithai_ngay)] <- 0
+data$tuoithai_tuan[data$tuoithai_tuan < 11 | data$tuoithai_tuan > 23] <- NA
+data$tuoithai <- data$tuoithai_tuan * 7 + data$tuoithai_ngay
+
+# change trimester based on fetus age
+data$sieuamkythun[data$tuoithai <= 97 & (data$sieuamkythun %in% c(2, 3, 4))] <- 1
+data$sieuamkythun[data$tuoithai >= 105 & !is.na(data$tuoithai) & (data$sieuamkythun %in% c(1, 3, 4))] <- 2
+```
+
+```{r cleaning data, include=FALSE}
+# Remove ketluan_hoichungdown if it's equal 0
+data$ketluan_hoichungdown[data$ketluan_hoichungdown == 0] <- NA
+
+# Replace chieudaidaumong
+data$chieudaidaumong[data$sieuamkythun == 2] <- NA
+data$chieudaidaumong[(data$chieudaidaumong > 600 | data$chieudaidaumong < 35) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$chieudaidaumong[data$chieudaidaumong < 38 & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+
+# Replace dau_duongkinhluongdinh
+data$dau_duongkinhluongdinh[(data$dau_duongkinhluongdinh > 31 | data$dau_duongkinhluongdinh == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+#data$dau_duongkinhluongdinh[data$dau_duongkinhluongdinh > 29 & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$dau_duongkinhluongdinh[data$dau_duongkinhluongdinh > 31 & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$dau_duongkinhluongdinh[(data$dau_duongkinhluongdinh > 64 | data$dau_duongkinhluongdinh < 17) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+
+# Replace dau_chuvidau
+data$dau_chuvidau[(data$dau_chuvidau > 107 | data$dau_chuvidau < 48) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+#data$dau_chuvidau[(data$dau_chuvidau > 100 | data$dau_chuvidau < 54) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$dau_chuvidau[(data$dau_chuvidau > 107 | data$dau_chuvidau < 48) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$dau_chuvidau[(data$dau_chuvidau > 227 | data$dau_chuvidau < 82) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+#data$dau_chuvidau[(data$dau_chuvidau > 225 | data$dau_chuvidau < 90) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+data$dau_chuvidau[(data$dau_chuvidau > 227 | data$dau_chuvidau < 82) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace dau_naothatben
+data$dau_naothatben[data$sieuamkythun == 1] <- NA
+data$dau_naothatben[(data$dau_naothatben > 7 | data$dau_naothatben < 3) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$dau_naothatben[(data$dau_naothatben > 7 | data$dau_naothatben < 3) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace mat_khoangcach2homat
+data$mat_khoangcach2homat[data$sieuamkythun == 1] <- NA
+#data$mat_khoangcach2homat[(data$mat_khoangcach2homat > 28 | data$mat_khoangcach2homat < 12) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$mat_khoangcach2homat[(data$mat_khoangcach2homat > 28 | data$mat_khoangcach2homat < 10) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$mat_khoangcach2homat[(data$mat_khoangcach2homat > 28 | data$mat_khoangcach2homat < 10) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace mat_xuongsongmui
+data$mat_xuongsongmui[data$sieuamkythun == 1] <- NA
+data$mat_xuongsongmui[(data$mat_xuongsongmui > 9 | data$mat_xuongsongmui < 1.2) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+#data$mat_xuongsongmui[(data$mat_xuongsongmui > 9 | data$mat_xuongsongmui < 1.4) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+data$mat_xuongsongmui[(data$mat_xuongsongmui > 9 | data$mat_xuongsongmui < 1.2) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace nguc_nhiptimthai
+data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 196 | data$nguc_nhiptimthai < 128) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+#data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 196 | data$nguc_nhiptimthai < 137) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 196 | data$nguc_nhiptimthai < 128) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 177 | data$nguc_nhiptimthai < 130) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+#data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 170 | data$nguc_nhiptimthai < 135) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 177 | data$nguc_nhiptimthai < 130) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace chi_chieudaixuongdui
+data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 14 | data$chi_chieudaixuongdui < 3) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 14 | data$chi_chieudaixuongdui < 3) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 46 | data$chi_chieudaixuongdui < 7) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+#data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 40 | data$chi_chieudaixuongdui < 7) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 46 | data$chi_chieudaixuongdui < 7) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace d_mom_pappa
+data$d_mom_pappa[data$sieuamkythun == 2] <- NA
+data$d_mom_pappa[(data$d_mom_pappa > 1.75 | data$d_mom_pappa < 0.03) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$d_mom_pappa[(data$d_mom_pappa > 1.75 | data$d_mom_pappa < 0.03) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+
+# Replace d_mom_hcgb
+data$d_mom_hcgb[data$sieuamkythun == 2] <- NA
+data$d_mom_hcgb[(data$d_mom_hcgb > 3.8 | data$d_mom_hcgb == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$d_mom_hcgb[(data$d_mom_hcgb > 3.8 | data$d_mom_hcgb == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+
+# Replace t_mom_ue3
+data$t_mom_ue3[data$sieuamkythun == 1] <- NA
+data$t_mom_ue3[(data$t_mom_ue3 > 1.92 | data$t_mom_ue3 == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$t_mom_ue3[(data$t_mom_ue3 > 1.92 | data$t_mom_ue3 == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace t_mom_afp
+data$t_mom_afp[data$sieuamkythun == 1] <- NA
+data$t_mom_afp[(data$t_mom_afp > 1.53 | data$t_mom_afp == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$t_mom_afp[(data$t_mom_afp > 1.53 | data$t_mom_afp == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace t_mom_hcg
+data$t_mom_hcg[data$sieuamkythun == 1] <- NA
+data$t_mom_hcg[(data$t_mom_hcg > 4.5 | data$t_mom_hcg == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$t_mom_hcg[(data$t_mom_hcg > 4.5 | data$t_mom_hcg == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace d_khoangsangsaugay
+data$d_khoangsangsaugay[data$sieuamkythun == 2] <- NA
+data$d_khoangsangsaugay[(data$d_khoangsangsaugay > 4 | data$d_khoangsangsaugay == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$d_khoangsangsaugay[(data$d_khoangsangsaugay > 4 | data$d_khoangsangsaugay == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$d_khoangsangsaugay[is.na(data$d_khoangsangsaugay)] <- data$co_khoangsangsaugay[is.na(data$d_khoangsangsaugay)]
+data$d_khoangsangsaugay[data$sieuamkythun == 2] <- NA
+data$d_khoangsangsaugay[(data$d_khoangsangsaugay > 5.9 | data$d_khoangsangsaugay == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$d_khoangsangsaugay[(data$d_khoangsangsaugay > 5.9 | data$d_khoangsangsaugay == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+```
+
+```{r recode variable, include=FALSE}
+# Recode ketluan_hoichungdown
+data$ketluan_hoichungdown[data$ketluan_hoichungdown == 1] <- 0
+data$ketluan_hoichungdown[data$ketluan_hoichungdown == 2] <- 1
+data$ketluan_hoichungdown <- as.factor(data$ketluan_hoichungdown)
+data$ketluan_hoichungdown <- ifelse(data$ketluan_hoichungdown == 0, "No", "Yes")
+#data$ketluan_hoichungdown <- make.names(data$ketluan_hoichungdown)
+
+# Consider dulieu_kiemdinh as factor variable
+data$dulieu_kiemdinh <- as.factor(data$dulieu_kiemdinh)
+
+# Recode tiensusinhconhoichungdown
+data$tiensusinhconhoichungdown[data$tiensusinhconhoichungdown == 2] <- 0
+data$tiensusinhconhoichungdown <- as.factor(data$tiensusinhconhoichungdown)
+
+# Recode mat_moimui
+data$mat_moimui[data$mat_moimui == 1] <- 0
+data$mat_moimui[data$mat_moimui == 2] <- 1
+data$mat_moimui <- as.factor(data$mat_moimui)
+
+# Recode nguc_ditattim
+data$nguc_ditattim[data$nguc_ditattim == 2] <- 0
+data$nguc_ditattim <- as.factor(data$nguc_ditattim)
+```
+
+```{r define normalize function, include=FALSE}
+normalize <- function(x) {
+    norm <- ((x - min(x))/(max(x) - min(x)))
+    return (norm)
+}
+```
+
+```{r define model report function, include=FALSE}
+MySummary  <- function(data, lev = NULL, model = NULL){
+  a1 <- defaultSummary(data, lev, model)
+  b1 <- twoClassSummary(data, lev, model)
+  c1 <- prSummary(data, lev, model)
+  out <- c(a1, b1, c1)
+  out}
+```
+
+```{r display function, include=FALSE}
+my.render.cont <- function(x) {
+    with(stats.apply.rounding(stats.default(x), digits=2), c("",
+        "Mean (SD)"=sprintf("%s (± %s)", MEAN, SD)))
+}
+my.render.cat <- function(x) {
+    c("", sapply(stats.default(x), function(y) with(y,
+        sprintf("%d (%0.0f %%)", FREQ, PCT))))
+}
+```
+
+```{r sa_tk1, include=FALSE}
+# Get ultrasound semeter 1 ultrasound data
+sa_tk1 <- data %>%
+  filter(sieuamkythun == 1,
+         !is.na(tuoime),
+         !is.na(tuoithai),
+         !is.na(tiensusinhconhoichungdown),
+         !is.na(chieudaidaumong),
+         !is.na(dau_duongkinhluongdinh),
+         !is.na(dau_chuvidau),
+         !is.na(mat_moimui),
+         !is.na(nguc_nhiptimthai),
+         !is.na(d_khoangsangsaugay),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(dulieu_kiemdinh,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 1 ultrasound data, include=FALSE}
+# Get the dataset without dependent variable ketluan_hoichungdown
+sa_tk1_impute_model_data <- sa_tk1[, !(colnames(sa_tk1) == "ketluan_hoichungdown")]
+
+ignore <- sa_tk1_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the dataset
+sa_tk1_imputed <- mice(sa_tk1_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sa_tk1_impute_model_data)
+
+# Impute missing values in testing set
+sa_tk1_imputed <- complete(sa_tk1_imputed)
+
+sa_tk1_imputed <- cbind(sa_tk1_imputed, sa_tk1[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sa_tk1, include=FALSE}
+# Get ultrasound semeter 1 training data
+train_valid_sa_tk1 <- sa_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r valid_sa_tk1, include=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(train_valid_sa_tk1$ketluan_hoichungdown, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train_sa_tk1 <- train_valid_sa_tk1[ trainIndex,]
+valid_sa_tk1 <- train_valid_sa_tk1[-trainIndex,]
+```
+
+```{r test_sa_tk1, include=FALSE}
+# Get ultrasound semeter 1 testing data
+test_sa_tk1 <- sa_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r smote_train_sa_tk1, include=FALSE}
+# Perform SMOTENC oversampling method
+set.seed(123)
+train_sa_tk1$ketluan_hoichungdown = as.factor(train_sa_tk1$ketluan_hoichungdown)
+smote_train_sa_tk1 <- smotenc(train_sa_tk1, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+```
+
+```{r sa_tk1 preprocessing, include=FALSE}
+prepro_knn_sa_tk1 <- preProcess(train_sa_tk1, method = c("center", "scale"))
+knn_train_sa_tk1 <- predict(prepro_knn_sa_tk1, smote_train_sa_tk1)
+knn_valid_sa_tk1 <- predict(prepro_knn_sa_tk1, valid_sa_tk1)
+knn_test_sa_tk1 <- predict(prepro_knn_sa_tk1, test_sa_tk1)
+
+prepro_svm_sa_tk1 <- preProcess(train_sa_tk1, method = c("center", "scale"))
+svm_train_sa_tk1 <- predict(prepro_svm_sa_tk1, smote_train_sa_tk1)
+svm_valid_sa_tk1 <- predict(prepro_svm_sa_tk1, valid_sa_tk1)
+svm_test_sa_tk1 <- predict(prepro_svm_sa_tk1, test_sa_tk1)
+```
+
+```{r sa_tk1 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sa_tk1 <- train(ketluan_hoichungdown~., data = svm_train_sa_tk1, method = "svmLinear", trControl = trainControl, tuneGrid = expand.grid(C = 0.1), metric = "Accuracy")
+
+svm_sa_tk1
+```
+
+```{r sa_tk1 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sa_tk1 <- train(ketluan_hoichungdown~., data = train_sa_tk1, method = "rf", trControl = trainControl, tuneGrid = expand.grid(.mtry=1), ntree = 50, max_depth = 3, metric = "Accuracy")
+
+rf_sa_tk1
+```
+
+```{r sa_tk1 xgb model, include=FALSE}
+tune_grid <- expand.grid(
+  nrounds = c(200),
+  eta = c(0.1),
+  max_depth = c(5),
+  gamma = c(0),
+  colsample_bytree = c(0.6),
+  min_child_weight = c(2),
+  subsample = c(0.6)
+)
+
+# tune_grid <- expand.grid(
+#   nrounds = c(200),
+#   eta = c(0.3),
+#   max_depth = c(3),
+#   gamma = c(0),
+#   colsample_bytree = c(0.8),
+#   min_child_weight = c(1),
+#   subsample = c(1)
+# )
+
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sa_tk1 <- train(ketluan_hoichungdown~., data = train_sa_tk1, method = "xgbTree", trControl = trainControl, tuneGrid = tune_grid, metric = "Accuracy", verbosity = 0)
+
+xgb_sa_tk1
+```
+
+```{r sh_tk1, include=FALSE}
+# Get ultrasound semeter 1 ultrasound data
+sh_tk1 <- data %>%
+  filter(sieuamkythun == 1,
+         !is.na(d_mom_pappa),
+         !is.na(d_mom_hcgb),
+         !is.na(d_khoangsangsaugay),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(dulieu_kiemdinh,
+         d_mom_pappa,
+         d_mom_hcgb,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 1 biochemical data, include=FALSE}
+# Get the dataset without dependent variable ketluan_hoichungdown
+sh_tk1_impute_model_data <- sh_tk1[, !(colnames(sh_tk1) == "ketluan_hoichungdown")]
+
+ignore <- sh_tk1_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the dataset
+sh_tk1_imputed <- mice(sh_tk1_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sh_tk1_impute_model_data)
+
+# Impute missing values in testing set
+sh_tk1_imputed <- complete(sh_tk1_imputed)
+
+sh_tk1_imputed <- cbind(sh_tk1_imputed, sh_tk1[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sh_tk1, include=FALSE}
+# Get ultrasound semeter 1 training data
+train_valid_sh_tk1 <- sh_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(d_mom_pappa,
+         d_mom_hcgb,
+         ketluan_hoichungdown)
+```
+
+```{r valid_sh_tk1, include=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(train_valid_sh_tk1$ketluan_hoichungdown, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train_sh_tk1 <- train_valid_sh_tk1[ trainIndex,]
+valid_sh_tk1 <- train_valid_sh_tk1[-trainIndex,]
+```
+
+```{r test_sh_tk1, include=FALSE}
+# Get ultrasound semeter 1 testing data
+test_sh_tk1 <- sh_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(d_mom_pappa,
+         d_mom_hcgb,
+         ketluan_hoichungdown)
+```
+
+```{r smote_train_sh_tk1, include=FALSE}
+# Perform SMOTENC overshmpling method
+set.seed(123)
+train_sh_tk1$ketluan_hoichungdown = as.factor(train_sh_tk1$ketluan_hoichungdown)
+smote_train_sh_tk1 <- smotenc(train_sh_tk1, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+```
+
+```{r sh_tk1 preprocessing, include=FALSE}
+prepro_knn_sh_tk1 <- preProcess(train_sh_tk1, method = c("center", "scale"))
+knn_train_sh_tk1 <- predict(prepro_knn_sh_tk1, smote_train_sh_tk1)
+knn_valid_sh_tk1 <- predict(prepro_knn_sh_tk1, valid_sh_tk1)
+knn_test_sh_tk1 <- predict(prepro_knn_sh_tk1, test_sh_tk1)
+
+prepro_svm_sh_tk1 <- preProcess(train_sh_tk1, method = c("center", "scale"))
+svm_train_sh_tk1 <- predict(prepro_svm_sh_tk1, smote_train_sh_tk1)
+svm_valid_sh_tk1 <- predict(prepro_svm_sh_tk1, valid_sh_tk1)
+svm_test_sh_tk1 <- predict(prepro_svm_sh_tk1, test_sh_tk1)
+```
+
+```{r sh_tk1 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sh_tk1 <- train(ketluan_hoichungdown~., data=knn_train_sh_tk1, method="knn", trControl=trainControl, tuneGrid = data.frame(k = 9), metric = "Accuracy")
+
+knn_sh_tk1
+```
+
+```{r sh_tk1 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sh_tk1 <- train(ketluan_hoichungdown~., data = svm_train_sh_tk1, method = "svmLinear", trControl = trainControl, tuneGrid = expand.grid(C = 0.0001), metric = "Accuracy")
+
+svm_sh_tk1
+```
+
+```{r sh_tk1 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sh_tk1 <- train(ketluan_hoichungdown~., data = train_sh_tk1, method = "rf", trControl = trainControl, tuneGrid = expand.grid(.mtry=3), ntree = 50, max_depth = 3, metric = "Accuracy")
+
+rf_sh_tk1
+```
+
+```{r sh_tk1 xgb model, include=FALSE}
+tune_grid <- expand.grid(
+  nrounds = c(100),
+  eta = c(0.1),
+  max_depth = c(3),
+  gamma = c(0),
+  colsample_bytree = c(1),
+  min_child_weight = c(5),
+  subsample = c(1)
+)
+
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sh_tk1 <- train(ketluan_hoichungdown~., data = train_sh_tk1, method = "xgbTree", trControl = trainControl, tuneGrid = tune_grid, metric = "Accuracy", verbosity = 0)
+
+xgb_sh_tk1
+```
+
+```{r sash_tk1, include=FALSE}
+# Get trimester 1 ultrasound and biochemical data
+sash_tk1 <- data %>%
+  filter(sieuamkythun == 1,
+         !is.na(tuoime),
+         !is.na(tuoithai),
+         !is.na(tiensusinhconhoichungdown),
+         !is.na(chieudaidaumong),
+         !is.na(dau_duongkinhluongdinh),
+         !is.na(dau_chuvidau),
+         !is.na(mat_moimui),
+         !is.na(nguc_nhiptimthai),
+         !is.na(d_mom_pappa),
+         !is.na(d_mom_hcgb),
+         !is.na(d_khoangsangsaugay),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(sieuamkythun,
+         dulieu_kiemdinh,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 1 ultrasound and biochemical data, include=FALSE}
+# Get the dataset without dependent variable ketluan_hoichungdown
+sash_tk1_impute_model_data <- sash_tk1[, !(colnames(sash_tk1) == "ketluan_hoichungdown")]
+
+ignore <- sash_tk1_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the dataset
+sash_tk1_imputed <- mice(sash_tk1_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sash_tk1_impute_model_data)
+
+# Impute missing values in testing set
+sash_tk1_imputed <- complete(sash_tk1_imputed)
+
+sash_tk1_imputed <- cbind(sash_tk1_imputed, sash_tk1[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sash_tk1, include=FALSE}
+# Get ultrasound and biochemical semeter 1 training data
+train_valid_sash_tk1 <- sash_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_mom_pappa,
+         d_mom_hcgb,
+         ketluan_hoichungdown)
+```
+
+```{r valid_sash_tk1, include=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(train_valid_sash_tk1$ketluan_hoichungdown, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train_sash_tk1 <- train_valid_sash_tk1[ trainIndex,]
+valid_sash_tk1 <- train_valid_sash_tk1[-trainIndex,]
+```
+
+```{r test_sash_tk1, include=FALSE}
+# Get ultrasound and biochemical semeter 1 testing data
+test_sash_tk1 <- sash_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_mom_pappa,
+         d_mom_hcgb,
+         ketluan_hoichungdown)
+```
+
+```{r smote_sash_tk1, include=FALSE}
+# Perform SMOTE oversampling method
+set.seed(123)
+train_sash_tk1$ketluan_hoichungdown = as.factor(train_sash_tk1$ketluan_hoichungdown)
+smote_train_sash_tk1 <- smotenc(train_sash_tk1, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+```
+
+```{r sash_tk1 preprocessing, include=FALSE}
+prepro_knn_sash_tk1 <- preProcess(train_sash_tk1, method = c("center", "scale"))
+knn_train_sash_tk1 <- predict(prepro_knn_sash_tk1, smote_train_sash_tk1)
+knn_valid_sash_tk1 <- predict(prepro_knn_sash_tk1, valid_sash_tk1)
+knn_test_sash_tk1 <- predict(prepro_knn_sash_tk1, test_sash_tk1)
+
+prepro_svm_sash_tk1 <- preProcess(train_sash_tk1, method = c("center", "scale"))
+svm_train_sash_tk1 <- predict(prepro_svm_sash_tk1, smote_train_sash_tk1)
+svm_valid_sash_tk1 <- predict(prepro_svm_sash_tk1, valid_sash_tk1)
+svm_test_sash_tk1 <- predict(prepro_svm_sash_tk1, test_sash_tk1)
+```
+
+```{r sash_tk1 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sash_tk1 <- train(ketluan_hoichungdown~., data=knn_train_sash_tk1, method="knn", trControl=trainControl, tuneGrid = data.frame(k = 12), metric = "Accuracy")
+
+knn_sash_tk1
+```
+
+```{r sash_tk1 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sash_tk1 <- train(ketluan_hoichungdown~., data = svm_train_sash_tk1, method = "svmLinear", trControl = trainControl, tuneGrid = expand.grid(C = 0.5), metric = "Accuracy")
+
+svm_sash_tk1
+```
+
+```{r sash_tk1 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sash_tk1 <- train(ketluan_hoichungdown~., data = train_sash_tk1, method = "rf", trControl = trainControl, tuneGrid = expand.grid(.mtry=2), ntree = 200, max_depth = 2,  metric = "Accuracy")
+
+rf_sash_tk1
+```
+
+```{r sash_tk1 xgb model, include=FALSE}
+# tune_grid <- expand.grid(
+#   nrounds = c(150),
+#   eta = c(0.3),
+#   max_depth = c(3),
+#   gamma = c(1),
+#   colsample_bytree = c(0.8),
+#   min_child_weight = c(0.8),
+#   subsample = c(0.75)
+# )
+
+tune_grid <- expand.grid(
+  nrounds = c(200),
+  eta = c(0.1),
+  max_depth = c(5),
+  gamma = c(0),
+  colsample_bytree = c(0.6),
+  min_child_weight = c(1),
+  subsample = c(0.6)
+)
+
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sash_tk1 <- train(ketluan_hoichungdown~., data = train_sash_tk1, method = "xgbTree", trControl = trainControl, tuneGrid = tune_grid, metric = "Accuracy", verbosity = 0)
+
+xgb_sash_tk1
+```
+
+```{r sa_tk2, include=FALSE}
+# Get ultrasound semeter 2 ultrasound data
+sa_tk2 <- data %>%
+  filter(sieuamkythun == 2,
+         !is.na(tuoime),
+         !is.na(tuoithai),
+         !is.na(tiensusinhconhoichungdown),
+         !is.na(dau_duongkinhluongdinh),
+         !is.na(dau_chuvidau),
+         #!is.na(dau_naothatben),
+         #!is.na(mat_khoangcach2homat),
+         #!is.na(mat_xuongsongmui),
+         !is.na(mat_moimui),
+         !is.na(nguc_nhiptimthai),
+         !is.na(nguc_ditattim),
+         !is.na(chi_chieudaixuongdui),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(sieuamkythun,
+         dulieu_kiemdinh,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         mat_moimui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 2 ultrasound data, message=FALSE, warning=FALSE, include=FALSE}
+# Get the dataset without dependent variable ketluan_hoichungdown
+sa_tk2_impute_model_data <- sa_tk2[, !(colnames(sa_tk2) == "ketluan_hoichungdown")]
+
+ignore <- sa_tk2_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the dataset
+sa_tk2_imputed <- mice(sa_tk2_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sa_tk2_impute_model_data)
+
+# Impute missing values in testing set
+sa_tk2_imputed <- complete(sa_tk2_imputed)
+
+sa_tk2_imputed <- cbind(sa_tk2_imputed, sa_tk2[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sa_tk2, include=FALSE}
+# Get ultrasound trimester 2 training data
+train_valid_sa_tk2 <- sa_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         mat_moimui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r valid_sa_tk2, include=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(train_valid_sa_tk2$ketluan_hoichungdown, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train_sa_tk2 <- train_valid_sa_tk2[ trainIndex,]
+valid_sa_tk2 <- train_valid_sa_tk2[-trainIndex,]
+```
+
+```{r test_sa_tk2, include=FALSE}
+# Get ultrasound trimester 2 testing data
+test_sa_tk2 <- sa_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,         
+         mat_moimui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r smote_train_sa_tk2, include=FALSE}
+# Perform SMOTE oversampling method
+set.seed(123)
+train_sa_tk2$ketluan_hoichungdown = as.factor(train_sa_tk2$ketluan_hoichungdown)
+smote_train_sa_tk2 <- smotenc(train_sa_tk2, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+```
+
+```{r sa_tk2 preprocessing, include=FALSE}
+prepro_knn_sa_tk2 <- preProcess(train_sa_tk2, method = c("center", "scale"))
+knn_train_sa_tk2 <- predict(prepro_knn_sa_tk2, smote_train_sa_tk2)
+knn_valid_sa_tk2 <- predict(prepro_knn_sa_tk2, valid_sa_tk2)
+knn_test_sa_tk2 <- predict(prepro_knn_sa_tk2, test_sa_tk2)
+
+prepro_svm_sa_tk2 <- preProcess(train_sa_tk2, method = c("center", "scale"))
+svm_train_sa_tk2 <- predict(prepro_svm_sa_tk2, smote_train_sa_tk2)
+svm_valid_sa_tk2 <- predict(prepro_svm_sa_tk2, valid_sa_tk2)
+svm_test_sa_tk2 <- predict(prepro_svm_sa_tk2, test_sa_tk2)
+```
+
+```{r sa_tk2 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sa_tk2 <- train(ketluan_hoichungdown~., data=knn_train_sa_tk2, method="knn", trControl=trainControl, tuneGrid = data.frame(k = 36), metric = "Accuracy")
+
+knn_sa_tk2
+```
+
+```{r sa_tk2 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sa_tk2 <- train(ketluan_hoichungdown~., data = svm_train_sa_tk2, method = "svmLinear", trControl = trainControl, tuneGrid = expand.grid(C = 0.02), metric = "Accuracy")
+
+svm_sa_tk2
+```
+
+```{r sa_tk2 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sa_tk2 <- train(ketluan_hoichungdown~., data = train_sa_tk2, method = "rf", trControl = trainControl, tuneGrid = expand.grid(.mtry=5), ntree = 50, max_depth = 3, metric = "Accuracy")
+
+rf_sa_tk2
+```
+
+```{r sa_tk2 xgb model, include=FALSE}
+tune_grid <- expand.grid(
+  nrounds = c(200),
+  min_child_weight = c(5),
+  gamma = c(0),
+  subsample = c(1),
+  colsample_bytree = c(0.6),
+  max_depth = c(7),
+  eta = c(0.1)
+)
+
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sa_tk2 <- train(ketluan_hoichungdown~., data = train_sa_tk2, method = "xgbTree", trControl = trainControl, tuneGrid = tune_grid, metric = "Accuracy", verbosity = 0)
+
+xgb_sa_tk2
+```
+
+```{r sh_tk2, include=FALSE}
+# Get ultrasound trimester 1 ultrasound data
+sh_tk2 <- data %>%
+  filter(sieuamkythun == 2,
+         !is.na(t_mom_afp),
+         !is.na(t_mom_hcg),
+         !is.na(t_mom_ue3),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(dulieu_kiemdinh,
+         t_mom_afp,
+         t_mom_hcg,
+         t_mom_ue3,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 2 biochemical data, include=FALSE}
+# Get the dataset without dependent variable ketluan_hoichungdown
+sh_tk2_impute_model_data <- sh_tk2[, !(colnames(sh_tk2) == "ketluan_hoichungdown")]
+
+ignore <- sh_tk2_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the dataset
+sh_tk2_imputed <- mice(sh_tk2_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sh_tk2_impute_model_data)
+
+# Impute missing values in testing set
+sh_tk2_imputed <- complete(sh_tk2_imputed)
+
+sh_tk2_imputed <- cbind(sh_tk2_imputed, sh_tk2[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sh_tk2, include=FALSE}
+# Get ultrasound semeter 1 training data
+train_valid_sh_tk2 <- sh_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(t_mom_afp,
+         t_mom_hcg,
+         t_mom_ue3,
+         ketluan_hoichungdown)
+```
+
+```{r valid_sh_tk2, include=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(train_valid_sh_tk2$ketluan_hoichungdown, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train_sh_tk2 <- train_valid_sh_tk2[ trainIndex,]
+valid_sh_tk2 <- train_valid_sh_tk2[-trainIndex,]
+```
+
+```{r test_sh_tk2, include=FALSE}
+# Get ultrasound trimester 1 testing data
+test_sh_tk2 <- sh_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(t_mom_afp,
+         t_mom_hcg,
+         t_mom_ue3,
+         ketluan_hoichungdown)
+```
+
+```{r smote_train_sh_tk2, include=FALSE}
+# Perform SMOTENC oversampling method
+set.seed(123)
+train_sh_tk2$ketluan_hoichungdown = as.factor(train_sh_tk2$ketluan_hoichungdown)
+smote_train_sh_tk2 <- smotenc(train_sh_tk2, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+```
+
+```{r sh_tk2 preprocessing, include=FALSE}
+prepro_knn_sh_tk2 <- preProcess(train_sh_tk2, method = c("center", "scale"))
+knn_train_sh_tk2 <- predict(prepro_knn_sh_tk2, smote_train_sh_tk2)
+knn_valid_sh_tk2 <- predict(prepro_knn_sh_tk2, valid_sh_tk2)
+knn_test_sh_tk2 <- predict(prepro_knn_sh_tk2, test_sh_tk2)
+
+prepro_svm_sh_tk2 <- preProcess(train_sh_tk2, method = c("center", "scale"))
+svm_train_sh_tk2 <- predict(prepro_svm_sh_tk2, smote_train_sh_tk2)
+svm_valid_sh_tk2 <- predict(prepro_svm_sh_tk2, valid_sh_tk2)
+svm_test_sh_tk2 <- predict(prepro_svm_sh_tk2, test_sh_tk2)
+```
+
+```{r sh_tk2 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sh_tk2 <- train(ketluan_hoichungdown~., data=knn_train_sh_tk2, method="knn", trControl=trainControl, tuneGrid = data.frame(k = 59), metric = "Accuracy")
+
+knn_sh_tk2
+```
+
+```{r sh_tk2 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sh_tk2 <- train(ketluan_hoichungdown~., data = svm_train_sh_tk2, method = "svmLinear", trControl = trainControl, tuneGrid = expand.grid(C = 0.4), metric = "Accuracy")
+
+svm_sh_tk2
+```
+
+```{r sh_tk2 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sh_tk2 <- train(ketluan_hoichungdown~., data = train_sh_tk2, method = "rf", trControl = trainControl, tuneGrid = expand.grid(.mtry=1), ntree = 50, max_depth = 3, metric = "Accuracy")
+
+rf_sh_tk2
+```
+
+```{r sh_tk2 xgb model, include=FALSE}
+tune_grid <- expand.grid(
+  nrounds = c(100),
+  min_child_weight = c(1),
+  gamma = c(0),
+  subsample = c(0.8),
+  colsample_bytree = c(1),
+  max_depth = c(5),
+  eta = c(0.01)
+)
+
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sh_tk2 <- train(ketluan_hoichungdown~., data = train_sh_tk2, method = "xgbTree", trControl = trainControl, tuneGrid = tune_grid, metric = "Accuracy", verbosity = 0)
+
+xgb_sh_tk2
+```
+
+```{r sash_tk2, include=FALSE}
+# Get ultrasound trimester 2 ultrasound and biochemical data
+sash_tk2 <- data %>%
+  filter(sieuamkythun == 2,
+         !is.na(tuoime),
+         !is.na(tuoithai),
+         !is.na(tiensusinhconhoichungdown),
+         !is.na(dau_duongkinhluongdinh),
+         !is.na(dau_chuvidau),
+         # !is.na(dau_naothatben),
+         # !is.na(mat_khoangcach2homat),
+         # !is.na(mat_xuongsongmui),
+         !is.na(mat_moimui),
+         !is.na(nguc_nhiptimthai),
+         !is.na(nguc_ditattim),
+         !is.na(t_mom_ue3),
+         !is.na(t_mom_afp),
+         !is.na(t_mom_hcg),
+         !is.na(chi_chieudaixuongdui),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(dulieu_kiemdinh,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         mat_moimui,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         t_mom_ue3,
+         t_mom_afp,
+         t_mom_hcg,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 2 ultrasound and biochemical data, include=FALSE}
+# Get the dataset without dependent variable ketluan_hoichungdown
+sash_tk2_impute_model_data <- sash_tk2[, !(colnames(sash_tk2) == "ketluan_hoichungdown")]
+
+ignore <- sash_tk2_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the dataset
+sash_tk2_imputed <- mice(sash_tk2_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sash_tk2_impute_model_data)
+
+# Impute missing values in testing set
+sash_tk2_imputed <- complete(sash_tk2_imputed)
+
+sash_tk2_imputed <- cbind(sash_tk2_imputed, sash_tk2[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sash_tk2, include=FALSE}
+# Get ultrasound and biochemical semeter 2 training data
+train_valid_sash_tk2 <- sash_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         mat_moimui,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         t_mom_ue3,
+         t_mom_afp,
+         t_mom_hcg,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r valid_sash_tk2, include=FALSE}
+set.seed(123)
+trainIndex <- createDataPartition(train_valid_sash_tk2$ketluan_hoichungdown, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+train_sash_tk2 <- train_valid_sash_tk2[ trainIndex,]
+valid_sash_tk2 <- train_valid_sash_tk2[-trainIndex,]
+```
+
+```{r test_sash_tk2, include=FALSE}
+# Get ultrasound and biochemical semeter 2 testing data
+test_sash_tk2 <- sash_tk2 %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         mat_moimui,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         t_mom_ue3,
+         t_mom_afp,
+         t_mom_hcg,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r smote_sash_tk2, include=FALSE}
+# Perform SMOTE oversampling method
+set.seed(123)
+train_sash_tk2$ketluan_hoichungdown = as.factor(train_sash_tk2$ketluan_hoichungdown)
+smote_train_sash_tk2 <- smotenc(train_sash_tk2, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+```
+
+```{r sash_tk2 preprocessing, include=FALSE}
+prepro_knn_sash_tk2 <- preProcess(train_sash_tk2, method = c("center", "scale"))
+knn_train_sash_tk2 <- predict(prepro_knn_sash_tk2, smote_train_sash_tk2)
+knn_valid_sash_tk2 <- predict(prepro_knn_sash_tk2, valid_sash_tk2)
+knn_test_sash_tk2 <- predict(prepro_knn_sash_tk2, test_sash_tk2)
+
+prepro_svm_sash_tk2 <- preProcess(train_sash_tk2, method = c("center", "scale"))
+svm_train_sash_tk2 <- predict(prepro_svm_sash_tk2, smote_train_sash_tk2)
+svm_valid_sash_tk2 <- predict(prepro_svm_sash_tk2, valid_sash_tk2)
+svm_test_sash_tk2 <- predict(prepro_svm_sash_tk2, test_sash_tk2)
+```
+
+```{r sash_tk2 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sash_tk2 <- train(ketluan_hoichungdown~., data=knn_train_sash_tk2, method="knn", trControl=trainControl, tuneGrid = data.frame(k = 169), metric = "Accuracy")
+
+knn_sash_tk2
+```
+
+```{r sash_tk2 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sash_tk2 <- train(ketluan_hoichungdown~., data = svm_train_sash_tk2, method = "svmLinear", trControl = trainControl, tuneGrid = data.frame(C = 0.01), metric = "Accuracy")
+
+svm_sash_tk2
+```
+
+```{r sash_tk2 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sash_tk2 <- train(ketluan_hoichungdown~., data = train_sash_tk2, method = "rf", trControl = trainControl, tuneGrid = expand.grid(.mtry=7), ntree = 200, max_depth = 3, metric = "Accuracy")
+
+rf_sash_tk2
+```
+
+```{r sash_tk2 xgb model, include=FALSE}
+tune_grid <- expand.grid(
+  nrounds = c(50),
+  eta = c(0.1),
+  max_depth = c(3),
+  gamma = c(0),
+  colsample_bytree = c(0.6),
+  min_child_weight = c(1),
+  subsample = c(1)
+)
+
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sash_tk2 <- train(ketluan_hoichungdown~., data = train_sash_tk2, method = "xgbTree", trControl = trainControl, tuneGrid = tune_grid, metric = "Accuracy", verbosity = 0)
+
+xgb_sash_tk2
+```
+
+```{r knn sa_tk1, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  k = seq(1,100,by=1)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid$k[i]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  knn_sa_tk1 <- train(ketluan_hoichungdown~., data=knn_train_sa_tk1, method="knn", tuneGrid = data.frame(k = params), trControl=trainControl, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_knn_sa_tk1 <- predict(knn_sa_tk1, newdata = knn_valid_sa_tk1, type = "prob")
+  prediction_knn_sa_tk1 <- predict(knn_sa_tk1, newdata = knn_test_sa_tk1, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_knn_sa_tk1 <- pROC::roc(knn_valid_sa_tk1$ketluan_hoichungdown, prediction_valid_knn_sa_tk1[,1])
+  coords_valid_knn_sa_tk1 <- coords(rp_valid_knn_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_knn_sa_tk1 <- pROC::roc(knn_test_sa_tk1$ketluan_hoichungdown, prediction_knn_sa_tk1[,1])
+  coords_knn_sa_tk1 <- coords(rp_knn_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- knn_sa_tk1$results$Accuracy - coords_valid_knn_sa_tk1$accuracy
+  acc_sum <- coords_valid_knn_sa_tk1$accuracy + coords_knn_sa_tk1$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  print(params)
+  print(best_params)
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r knn sh_tk1}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  k = seq(1,100,by=1)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid$k[i]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  knn_sh_tk1 <- train(ketluan_hoichungdown~., data=knn_train_sh_tk1, method="knn", tuneGrid = data.frame(k = params), trControl=trainControl, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_knn_sh_tk1 <- predict(knn_sh_tk1, newdata = knn_valid_sh_tk1, type = "prob")
+  prediction_knn_sh_tk1 <- predict(knn_sh_tk1, newdata = knn_test_sh_tk1, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_knn_sh_tk1 <- pROC::roc(knn_valid_sh_tk1$ketluan_hoichungdown, prediction_valid_knn_sh_tk1[,1])
+  coords_valid_knn_sh_tk1 <- coords(rp_valid_knn_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_knn_sh_tk1 <- pROC::roc(knn_test_sh_tk1$ketluan_hoichungdown, prediction_knn_sh_tk1[,1])
+  coords_knn_sh_tk1 <- coords(rp_knn_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- knn_sh_tk1$results$Accuracy - coords_valid_knn_sh_tk1$accuracy
+  acc_sum <- coords_valid_knn_sh_tk1$accuracy + coords_knn_sh_tk1$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  print(params)
+  print(best_params)
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r knn sash_tk1, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  k = seq(1,100,by=1)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid$k[i]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  knn_sash_tk1 <- train(ketluan_hoichungdown~., data=knn_train_sash_tk1, method="knn", tuneGrid = data.frame(k = params), trControl=trainControl, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_knn_sash_tk1 <- predict(knn_sash_tk1, newdata = knn_valid_sash_tk1, type = "prob")
+  prediction_knn_sash_tk1 <- predict(knn_sash_tk1, newdata = knn_test_sash_tk1, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_knn_sash_tk1 <- pROC::roc(knn_valid_sash_tk1$ketluan_hoichungdown, prediction_valid_knn_sash_tk1[,1])
+  coords_valid_knn_sash_tk1 <- coords(rp_valid_knn_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_knn_sash_tk1 <- pROC::roc(knn_test_sash_tk1$ketluan_hoichungdown, prediction_knn_sash_tk1[,1])
+  coords_knn_sash_tk1 <- coords(rp_knn_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- knn_sash_tk1$results$Accuracy - coords_valid_knn_sash_tk1$accuracy
+  acc_sum <- coords_valid_knn_sash_tk1$accuracy + coords_knn_sash_tk1$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  print(params)
+  print(best_params)
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r knn sa_tk2, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  k = seq(1,100,by=1)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid$k[i]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  knn_sa_tk2 <- train(ketluan_hoichungdown~., data=knn_train_sa_tk2, method="knn", tuneGrid = data.frame(k = params), trControl=trainControl, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_knn_sa_tk2 <- predict(knn_sa_tk2, newdata = knn_valid_sa_tk2, type = "prob")
+  prediction_knn_sa_tk2 <- predict(knn_sa_tk2, newdata = knn_test_sa_tk2, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_knn_sa_tk2 <- pROC::roc(knn_valid_sa_tk2$ketluan_hoichungdown, prediction_valid_knn_sa_tk2[,1])
+  coords_valid_knn_sa_tk2 <- coords(rp_valid_knn_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_knn_sa_tk2 <- pROC::roc(knn_test_sa_tk2$ketluan_hoichungdown, prediction_knn_sa_tk2[,1])
+  coords_knn_sa_tk2 <- coords(rp_knn_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- knn_sa_tk2$results$Accuracy - coords_valid_knn_sa_tk2$accuracy
+  acc_sum <- coords_valid_knn_sa_tk2$accuracy + coords_knn_sa_tk2$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  print(params)
+  print(best_params)
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r knn sh_tk2}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  k = seq(1,100,by=1)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid$k[i]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  knn_sh_tk2 <- train(ketluan_hoichungdown~., data=knn_train_sh_tk2, method="knn", tuneGrid = data.frame(k = params), trControl=trainControl, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_knn_sh_tk2 <- predict(knn_sh_tk2, newdata = knn_valid_sh_tk2, type = "prob")
+  prediction_knn_sh_tk2 <- predict(knn_sh_tk2, newdata = knn_test_sh_tk2, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_knn_sh_tk2 <- pROC::roc(knn_valid_sh_tk2$ketluan_hoichungdown, prediction_valid_knn_sh_tk2[,1])
+  coords_valid_knn_sh_tk2 <- coords(rp_valid_knn_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_knn_sh_tk2 <- pROC::roc(knn_test_sh_tk2$ketluan_hoichungdown, prediction_knn_sh_tk2[,1])
+  coords_knn_sh_tk2 <- coords(rp_knn_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- knn_sh_tk2$results$Accuracy - coords_valid_knn_sh_tk2$accuracy
+  acc_sum <- coords_valid_knn_sh_tk2$accuracy + coords_knn_sh_tk2$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  print(params)
+  print(best_params)
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r knn sash_tk2, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  k = seq(1,200,by=1)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid$k[i]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  knn_sash_tk2 <- train(ketluan_hoichungdown~., data=knn_train_sash_tk2, method="knn", tuneGrid = data.frame(k = params), trControl=trainControl, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_knn_sash_tk2 <- predict(knn_sash_tk2, newdata = knn_valid_sash_tk2, type = "prob")
+  prediction_knn_sash_tk2 <- predict(knn_sash_tk2, newdata = knn_test_sash_tk2, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_knn_sash_tk2 <- pROC::roc(knn_valid_sash_tk2$ketluan_hoichungdown, prediction_valid_knn_sash_tk2[,1])
+  coords_valid_knn_sash_tk2 <- coords(rp_valid_knn_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_knn_sash_tk2 <- pROC::roc(knn_test_sash_tk2$ketluan_hoichungdown, prediction_knn_sash_tk2[,1])
+  coords_knn_sash_tk2 <- coords(rp_knn_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- knn_sash_tk2$results$Accuracy - coords_valid_knn_sash_tk2$accuracy
+  acc_sum <- coords_valid_knn_sash_tk2$accuracy + coords_knn_sash_tk2$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (acc_sum > best_acc_sum) {
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  print(params)
+  print(best_params)
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r svm sa_tk1, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  C = seq(0.01, 1, by = 0.01)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid$C[i]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  svm_sa_tk1 <- train(ketluan_hoichungdown~., data=svm_train_sa_tk1, method="svmLinear", tuneGrid = data.frame(C = params), trControl=trainControl, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_svm_sa_tk1 <- predict(svm_sa_tk1, newdata = svm_valid_sa_tk1, type = "prob")
+  prediction_svm_sa_tk1 <- predict(svm_sa_tk1, newdata = svm_test_sa_tk1, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_svm_sa_tk1 <- pROC::roc(svm_valid_sa_tk1$ketluan_hoichungdown, prediction_valid_svm_sa_tk1[,1])
+  coords_valid_svm_sa_tk1 <- coords(rp_valid_svm_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_svm_sa_tk1 <- pROC::roc(svm_test_sa_tk1$ketluan_hoichungdown, prediction_svm_sa_tk1[,1])
+  coords_svm_sa_tk1 <- coords(rp_svm_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- svm_sa_tk1$results$Accuracy - coords_valid_svm_sa_tk1$accuracy
+  acc_sum <- coords_valid_svm_sa_tk1$accuracy + coords_svm_sa_tk1$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  print(params)
+  print(best_params)
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r svm sh_tk1}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  C = seq(0.01, 1, by = 0.01)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid$C[i]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  svm_sh_tk1 <- train(ketluan_hoichungdown~., data=svm_train_sh_tk1, method="svmLinear", tuneGrid = data.frame(C = params), trControl=trainControl, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_svm_sh_tk1 <- predict(svm_sh_tk1, newdata = svm_valid_sh_tk1, type = "prob")
+  prediction_svm_sh_tk1 <- predict(svm_sh_tk1, newdata = svm_test_sh_tk1, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_svm_sh_tk1 <- pROC::roc(svm_valid_sh_tk1$ketluan_hoichungdown, prediction_valid_svm_sh_tk1[,1])
+  coords_valid_svm_sh_tk1 <- coords(rp_valid_svm_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_svm_sh_tk1 <- pROC::roc(svm_test_sh_tk1$ketluan_hoichungdown, prediction_svm_sh_tk1[,1])
+  coords_svm_sh_tk1 <- coords(rp_svm_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- svm_sh_tk1$results$Accuracy - coords_valid_svm_sh_tk1$accuracy
+  acc_sum <- coords_valid_svm_sh_tk1$accuracy + coords_svm_sh_tk1$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  print(params)
+  print(best_params)
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r svm sash_tk1, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  C = seq(0.01, 1, by = 0.01)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid$C[i]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  svm_sash_tk1 <- train(ketluan_hoichungdown~., data=svm_train_sash_tk1, method="svmLinear", tuneGrid = data.frame(C = params), trControl=trainControl, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_svm_sash_tk1 <- predict(svm_sash_tk1, newdata = svm_valid_sash_tk1, type = "prob")
+  prediction_svm_sash_tk1 <- predict(svm_sash_tk1, newdata = svm_test_sash_tk1, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_svm_sash_tk1 <- pROC::roc(svm_valid_sash_tk1$ketluan_hoichungdown, prediction_valid_svm_sash_tk1[,1])
+  coords_valid_svm_sash_tk1 <- coords(rp_valid_svm_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_svm_sash_tk1 <- pROC::roc(svm_test_sash_tk1$ketluan_hoichungdown, prediction_svm_sash_tk1[,1])
+  coords_svm_sash_tk1 <- coords(rp_svm_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- svm_sash_tk1$results$Accuracy - coords_valid_svm_sash_tk1$accuracy
+  acc_sum <- coords_valid_svm_sash_tk1$accuracy + coords_svm_sash_tk1$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  print(params)
+  print(best_params)
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r svm sa_tk2, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  C = seq(0.01, 1, by = 0.01)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid$C[i]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  svm_sa_tk2 <- train(ketluan_hoichungdown~., data=svm_train_sa_tk2, method="svmLinear", tuneGrid = data.frame(C = params), trControl=trainControl, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_svm_sa_tk2 <- predict(svm_sa_tk2, newdata = svm_valid_sa_tk2, type = "prob")
+  prediction_svm_sa_tk2 <- predict(svm_sa_tk2, newdata = svm_test_sa_tk2, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_svm_sa_tk2 <- pROC::roc(svm_valid_sa_tk2$ketluan_hoichungdown, prediction_valid_svm_sa_tk2[,1])
+  coords_valid_svm_sa_tk2 <- coords(rp_valid_svm_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_svm_sa_tk2 <- pROC::roc(svm_test_sa_tk2$ketluan_hoichungdown, prediction_svm_sa_tk2[,1])
+  coords_svm_sa_tk2 <- coords(rp_svm_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- svm_sa_tk2$results$Accuracy - coords_valid_svm_sa_tk2$accuracy
+  acc_sum <- coords_valid_svm_sa_tk2$accuracy + coords_svm_sa_tk2$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  print(params)
+  print(best_params)
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r svm sh_tk2}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  C = seq(0.01, 1, by = 0.01)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid$C[i]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  svm_sh_tk2 <- train(ketluan_hoichungdown~., data=svm_train_sh_tk2, method="svmLinear", tuneGrid = data.frame(C = params), trControl=trainControl, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_svm_sh_tk2 <- predict(svm_sh_tk2, newdata = svm_valid_sh_tk2, type = "prob")
+  prediction_svm_sh_tk2 <- predict(svm_sh_tk2, newdata = svm_test_sh_tk2, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_svm_sh_tk2 <- pROC::roc(svm_valid_sh_tk2$ketluan_hoichungdown, prediction_valid_svm_sh_tk2[,1])
+  coords_valid_svm_sh_tk2 <- coords(rp_valid_svm_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_svm_sh_tk2 <- pROC::roc(svm_test_sh_tk2$ketluan_hoichungdown, prediction_svm_sh_tk2[,1])
+  coords_svm_sh_tk2 <- coords(rp_svm_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- svm_sh_tk2$results$Accuracy - coords_valid_svm_sh_tk2$accuracy
+  acc_sum <- coords_valid_svm_sh_tk2$accuracy + coords_svm_sh_tk2$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  print(params)
+  print(best_params)
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r svm sash_tk2, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  C = seq(0.01, 1, by = 0.01)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid$C[i]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  svm_sash_tk2 <- train(ketluan_hoichungdown~., data=svm_train_sash_tk2, method="svmLinear", tuneGrid = data.frame(C = params), trControl=trainControl, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_svm_sash_tk2 <- predict(svm_sash_tk2, newdata = svm_valid_sash_tk2, type = "prob")
+  prediction_svm_sash_tk2 <- predict(svm_sash_tk2, newdata = svm_test_sash_tk2, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_svm_sash_tk2 <- pROC::roc(svm_valid_sash_tk2$ketluan_hoichungdown, prediction_valid_svm_sash_tk2[,1])
+  coords_valid_svm_sash_tk2 <- coords(rp_valid_svm_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_svm_sash_tk2 <- pROC::roc(svm_test_sash_tk2$ketluan_hoichungdown, prediction_svm_sash_tk2[,1])
+  coords_svm_sash_tk2 <- coords(rp_svm_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- svm_sash_tk2$results$Accuracy - coords_valid_svm_sash_tk2$accuracy
+  acc_sum <- coords_valid_svm_sash_tk2$accuracy + coords_svm_sash_tk2$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  print(params)
+  print(best_params)
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r rf sa_tk1, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  mtry = seq(1,8,by=1),
+  ntree = c(50, 100, 200),
+  max_depth = seq(3,5,by = 1)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid[i, ]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  rf_sa_tk1 <- train(ketluan_hoichungdown~., data=train_sa_tk1, method="rf", trControl=trainControl, tuneGrid = expand.grid(.mtry=params$mtry), ntree = params$ntree, max_depth = params$max_depth, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_rf_sa_tk1 <- predict(rf_sa_tk1, newdata = valid_sa_tk1, type = "prob")
+  prediction_rf_sa_tk1 <- predict(rf_sa_tk1, newdata = test_sa_tk1, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_rf_sa_tk1 <- pROC::roc(valid_sa_tk1$ketluan_hoichungdown, prediction_valid_rf_sa_tk1[,1])
+  coords_valid_rf_sa_tk1 <- coords(rp_valid_rf_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_rf_sa_tk1 <- pROC::roc(test_sa_tk1$ketluan_hoichungdown, prediction_rf_sa_tk1[,1])
+  coords_rf_sa_tk1 <- coords(rp_rf_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- rf_sa_tk1$results$Accuracy - coords_valid_rf_sa_tk1$accuracy
+  acc_sum <- coords_valid_rf_sa_tk1$accuracy + coords_rf_sa_tk1$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  params
+  best_params
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r rf sh_tk1}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  mtry = seq(1,8,by=1),
+  ntree = c(50, 100, 200),
+  max_depth = seq(3,5,by = 1)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid[i, ]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  rf_sh_tk1 <- train(ketluan_hoichungdown~., data=train_sh_tk1, method="rf", trControl=trainControl, tuneGrid = expand.grid(.mtry=params$mtry), ntree = params$ntree, max_depth = params$max_depth, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_rf_sh_tk1 <- predict(rf_sh_tk1, newdata = valid_sh_tk1, type = "prob")
+  prediction_rf_sh_tk1 <- predict(rf_sh_tk1, newdata = test_sh_tk1, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_rf_sh_tk1 <- pROC::roc(valid_sh_tk1$ketluan_hoichungdown, prediction_valid_rf_sh_tk1[,1])
+  coords_valid_rf_sh_tk1 <- coords(rp_valid_rf_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_rf_sh_tk1 <- pROC::roc(test_sh_tk1$ketluan_hoichungdown, prediction_rf_sh_tk1[,1])
+  coords_rf_sh_tk1 <- coords(rp_rf_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- rf_sh_tk1$results$Accuracy - coords_valid_rf_sh_tk1$accuracy
+  acc_sum <- coords_valid_rf_sh_tk1$accuracy + coords_rf_sh_tk1$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  params
+  best_params
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r rf sash_tk1, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  mtry = seq(1,8,by=1),
+  ntree = c(50, 100, 200),
+  max_depth = seq(3,5,by = 1)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid[i, ]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  rf_sash_tk1 <- train(ketluan_hoichungdown~., data=train_sash_tk1, method="rf", trControl=trainControl, tuneGrid = expand.grid(.mtry=params$mtry), ntree = params$ntree, max_depth = params$max_depth, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_rf_sash_tk1 <- predict(rf_sash_tk1, newdata = valid_sash_tk1, type = "prob")
+  prediction_rf_sash_tk1 <- predict(rf_sash_tk1, newdata = test_sash_tk1, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_rf_sash_tk1 <- pROC::roc(valid_sash_tk1$ketluan_hoichungdown, prediction_valid_rf_sash_tk1[,1])
+  coords_valid_rf_sash_tk1 <- coords(rp_valid_rf_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_rf_sash_tk1 <- pROC::roc(test_sash_tk1$ketluan_hoichungdown, prediction_rf_sash_tk1[,1])
+  coords_rf_sash_tk1 <- coords(rp_rf_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- rf_sash_tk1$results$Accuracy - coords_valid_rf_sash_tk1$accuracy
+  acc_sum <- coords_valid_rf_sash_tk1$accuracy + coords_rf_sash_tk1$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  params
+  best_params
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r rf sa_tk2, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  mtry = seq(1,8,by=1),
+  ntree = c(50, 100, 200),
+  max_depth = seq(3,5,by = 1)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid[i, ]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  rf_sa_tk2 <- train(ketluan_hoichungdown~., data=train_sa_tk2, method="rf", trControl=trainControl, tuneGrid = expand.grid(.mtry=params$mtry), ntree = params$ntree, max_depth = params$max_depth, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_rf_sa_tk2 <- predict(rf_sa_tk2, newdata = valid_sa_tk2, type = "prob")
+  prediction_rf_sa_tk2 <- predict(rf_sa_tk2, newdata = test_sa_tk2, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_rf_sa_tk2 <- pROC::roc(valid_sa_tk2$ketluan_hoichungdown, prediction_valid_rf_sa_tk2[,1])
+  coords_valid_rf_sa_tk2 <- coords(rp_valid_rf_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_rf_sa_tk2 <- pROC::roc(test_sa_tk2$ketluan_hoichungdown, prediction_rf_sa_tk2[,1])
+  coords_rf_sa_tk2 <- coords(rp_rf_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- rf_sa_tk2$results$Accuracy - coords_valid_rf_sa_tk2$accuracy
+  acc_sum <- coords_valid_rf_sa_tk2$accuracy + coords_rf_sa_tk2$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  params
+  best_params
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r rf sh_tk2}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  mtry = seq(1,8,by=1),
+  ntree = c(50, 100, 200),
+  max_depth = seq(3,5,by = 1)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid[i, ]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  rf_sh_tk2 <- train(ketluan_hoichungdown~., data=train_sh_tk2, method="rf", trControl=trainControl, tuneGrid = expand.grid(.mtry=params$mtry), ntree = params$ntree, max_depth = params$max_depth, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_rf_sh_tk2 <- predict(rf_sh_tk2, newdata = valid_sh_tk2, type = "prob")
+  prediction_rf_sh_tk2 <- predict(rf_sh_tk2, newdata = test_sh_tk2, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_rf_sh_tk2 <- pROC::roc(valid_sh_tk2$ketluan_hoichungdown, prediction_valid_rf_sh_tk2[,1])
+  coords_valid_rf_sh_tk2 <- coords(rp_valid_rf_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_rf_sh_tk2 <- pROC::roc(test_sh_tk2$ketluan_hoichungdown, prediction_rf_sh_tk2[,1])
+  coords_rf_sh_tk2 <- coords(rp_rf_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- rf_sh_tk2$results$Accuracy - coords_valid_rf_sh_tk2$accuracy
+  acc_sum <- coords_valid_rf_sh_tk2$accuracy + coords_rf_sh_tk2$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  params
+  best_params
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r rf sash_tk2, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  mtry = seq(1,8,by=1),
+  ntree = c(50, 100, 200),
+  max_depth = seq(3,5,by = 1)
+)
+
+# Perform grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid[i, ]
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  rf_sash_tk2 <- train(ketluan_hoichungdown~., data=train_sash_tk2, method="rf", trControl=trainControl, tuneGrid = expand.grid(.mtry=params$mtry), ntree = params$ntree, max_depth = params$max_depth, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_rf_sash_tk2 <- predict(rf_sash_tk2, newdata = valid_sash_tk2, type = "prob")
+  prediction_rf_sash_tk2 <- predict(rf_sash_tk2, newdata = test_sash_tk2, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_rf_sash_tk2 <- pROC::roc(valid_sash_tk2$ketluan_hoichungdown, prediction_valid_rf_sash_tk2[,1])
+  coords_valid_rf_sash_tk2 <- coords(rp_valid_rf_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_rf_sash_tk2 <- pROC::roc(test_sash_tk2$ketluan_hoichungdown, prediction_rf_sash_tk2[,1])
+  coords_rf_sash_tk2 <- coords(rp_rf_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- rf_sash_tk2$results$Accuracy - coords_valid_rf_sash_tk2$accuracy
+  acc_sum <- coords_valid_rf_sash_tk2$accuracy + coords_rf_sash_tk2$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  params
+  best_params
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r xgb sa_tk1, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  nrounds = c(50,100,200),
+  min_child_weight = c(1,2,5),
+  gamma = c(0),
+  subsample = c(0.6,0.8,1),
+  colsample_bytree = c(0.6,0.8,1),
+  max_depth = c(3,5,7),
+  eta = c(0.1,0.01)
+)
+
+# Pexgborm grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid[i, ]
+  
+  tune <- expand.grid(nrounds = params$nrounds,
+            min_child_weight = params$min_child_weight,
+            gamma = params$gamma,
+            subsample = params$subsample,
+            colsample_bytree = params$colsample_bytree,
+            max_depth = params$max_depth,
+            eta = params$eta)
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  xgb_sa_tk1 <- train(ketluan_hoichungdown~., data=train_sa_tk1, method="xgbTree", trControl=trainControl, tuneGrid = tune, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_xgb_sa_tk1 <- predict(xgb_sa_tk1, newdata = valid_sa_tk1, type = "prob")
+  prediction_xgb_sa_tk1 <- predict(xgb_sa_tk1, newdata = test_sa_tk1, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_xgb_sa_tk1 <- pROC::roc(valid_sa_tk1$ketluan_hoichungdown, prediction_valid_xgb_sa_tk1[,1])
+  coords_valid_xgb_sa_tk1 <- coords(rp_valid_xgb_sa_tk1, "best", ret=c("thresashold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_xgb_sa_tk1 <- pROC::roc(test_sa_tk1$ketluan_hoichungdown, prediction_xgb_sa_tk1[,1])
+  coords_xgb_sa_tk1 <- coords(rp_xgb_sa_tk1, "best", ret=c("thresashold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- xgb_sa_tk1$results$Accuracy - coords_valid_xgb_sa_tk1$accuracy
+  acc_sum <- coords_valid_xgb_sa_tk1$accuracy + coords_xgb_sa_tk1$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  params
+  best_params
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r xgb sh_tk1}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  nrounds = c(50,100,200),
+  min_child_weight = c(1,2,5),
+  gamma = c(0),
+  subsample = c(0.6,0.8,1),
+  colsample_bytree = c(0.6,0.8,1),
+  max_depth = c(3,5,7),
+  eta = c(0.1,0.01)
+)
+
+# Pexgborm grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid[i, ]
+  
+  tune <- expand.grid(nrounds = params$nrounds,
+            min_child_weight = params$min_child_weight,
+            gamma = params$gamma,
+            subsample = params$subsample,
+            colsample_bytree = params$colsample_bytree,
+            max_depth = params$max_depth,
+            eta = params$eta)
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  xgb_sh_tk1 <- train(ketluan_hoichungdown~., data=train_sh_tk1, method="xgbTree", trControl=trainControl, tuneGrid = tune, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_xgb_sh_tk1 <- predict(xgb_sh_tk1, newdata = valid_sh_tk1, type = "prob")
+  prediction_xgb_sh_tk1 <- predict(xgb_sh_tk1, newdata = test_sh_tk1, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_xgb_sh_tk1 <- pROC::roc(valid_sh_tk1$ketluan_hoichungdown, prediction_valid_xgb_sh_tk1[,1])
+  coords_valid_xgb_sh_tk1 <- coords(rp_valid_xgb_sh_tk1, "best", ret=c("thresashold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_xgb_sh_tk1 <- pROC::roc(test_sh_tk1$ketluan_hoichungdown, prediction_xgb_sh_tk1[,1])
+  coords_xgb_sh_tk1 <- coords(rp_xgb_sh_tk1, "best", ret=c("thresashold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- xgb_sh_tk1$results$Accuracy - coords_valid_xgb_sh_tk1$accuracy
+  acc_sum <- coords_valid_xgb_sh_tk1$accuracy + coords_xgb_sh_tk1$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  params
+  best_params
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r xgb sash_tk1, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  nrounds = c(50,100,200),
+  min_child_weight = c(1,2,5),
+  gamma = c(0),
+  subsample = c(0.6,0.8,1),
+  colsample_bytree = c(0.6,0.8,1),
+  max_depth = c(3,5,7),
+  eta = c(0.1,0.01)
+)
+
+# Pexgborm grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid[i, ]
+  
+  tune <- expand.grid(nrounds = params$nrounds,
+            min_child_weight = params$min_child_weight,
+            gamma = params$gamma,
+            subsample = params$subsample,
+            colsample_bytree = params$colsample_bytree,
+            max_depth = params$max_depth,
+            eta = params$eta)
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  xgb_sash_tk1 <- train(ketluan_hoichungdown~., data=train_sash_tk1, method="xgbTree", trControl=trainControl, tuneGrid = tune, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_xgb_sash_tk1 <- predict(xgb_sash_tk1, newdata = valid_sash_tk1, type = "prob")
+  prediction_xgb_sash_tk1 <- predict(xgb_sash_tk1, newdata = test_sash_tk1, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_xgb_sash_tk1 <- pROC::roc(valid_sash_tk1$ketluan_hoichungdown, prediction_valid_xgb_sash_tk1[,1])
+  coords_valid_xgb_sash_tk1 <- coords(rp_valid_xgb_sash_tk1, "best", ret=c("thresashold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_xgb_sash_tk1 <- pROC::roc(test_sash_tk1$ketluan_hoichungdown, prediction_xgb_sash_tk1[,1])
+  coords_xgb_sash_tk1 <- coords(rp_xgb_sash_tk1, "best", ret=c("thresashold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- xgb_sash_tk1$results$Accuracy - coords_valid_xgb_sash_tk1$accuracy
+  acc_sum <- coords_valid_xgb_sash_tk1$accuracy + coords_xgb_sash_tk1$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  params
+  best_params
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r xgb sa_tk2, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  nrounds = c(50,100,200),
+  min_child_weight = c(1,2,5),
+  gamma = c(0),
+  subsample = c(0.6,0.8,1),
+  colsample_bytree = c(0.6,0.8,1),
+  max_depth = c(3,5,7),
+  eta = c(0.1,0.01)
+)
+
+# Pexgborm grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid[i, ]
+  
+  tune <- expand.grid(nrounds = params$nrounds,
+            min_child_weight = params$min_child_weight,
+            gamma = params$gamma,
+            subsample = params$subsample,
+            colsample_bytree = params$colsample_bytree,
+            max_depth = params$max_depth,
+            eta = params$eta)
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  xgb_sa_tk2 <- train(ketluan_hoichungdown~., data=train_sa_tk2, method="xgbTree", trControl=trainControl, tuneGrid = tune, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_xgb_sa_tk2 <- predict(xgb_sa_tk2, newdata = valid_sa_tk2, type = "prob")
+  prediction_xgb_sa_tk2 <- predict(xgb_sa_tk2, newdata = test_sa_tk2, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_xgb_sa_tk2 <- pROC::roc(valid_sa_tk2$ketluan_hoichungdown, prediction_valid_xgb_sa_tk2[,1])
+  coords_valid_xgb_sa_tk2 <- coords(rp_valid_xgb_sa_tk2, "best", ret=c("thresashold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_xgb_sa_tk2 <- pROC::roc(test_sa_tk2$ketluan_hoichungdown, prediction_xgb_sa_tk2[,1])
+  coords_xgb_sa_tk2 <- coords(rp_xgb_sa_tk2, "best", ret=c("thresashold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- xgb_sa_tk2$results$Accuracy - coords_valid_xgb_sa_tk2$accuracy
+  acc_sum <- coords_valid_xgb_sa_tk2$accuracy + coords_xgb_sa_tk2$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  params
+  best_params
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r xgb sh_tk2}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  nrounds = c(50,100,200),
+  min_child_weight = c(1,2,5),
+  gamma = c(0),
+  subsample = c(0.6,0.8,1),
+  colsample_bytree = c(0.6,0.8,1),
+  max_depth = c(3,5,7),
+  eta = c(0.1,0.01)
+)
+
+# Pexgborm grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid[i, ]
+  
+  tune <- expand.grid(nrounds = params$nrounds,
+            min_child_weight = params$min_child_weight,
+            gamma = params$gamma,
+            subsample = params$subsample,
+            colsample_bytree = params$colsample_bytree,
+            max_depth = params$max_depth,
+            eta = params$eta)
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  xgb_sh_tk2 <- train(ketluan_hoichungdown~., data=train_sh_tk2, method="xgbTree", trControl=trainControl, tuneGrid = tune, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_xgb_sh_tk2 <- predict(xgb_sh_tk2, newdata = valid_sh_tk2, type = "prob")
+  prediction_xgb_sh_tk2 <- predict(xgb_sh_tk2, newdata = test_sh_tk2, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_xgb_sh_tk2 <- pROC::roc(valid_sh_tk2$ketluan_hoichungdown, prediction_valid_xgb_sh_tk2[,1])
+  coords_valid_xgb_sh_tk2 <- coords(rp_valid_xgb_sh_tk2, "best", ret=c("thresashold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_xgb_sh_tk2 <- pROC::roc(test_sh_tk2$ketluan_hoichungdown, prediction_xgb_sh_tk2[,1])
+  coords_xgb_sh_tk2 <- coords(rp_xgb_sh_tk2, "best", ret=c("thresashold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- xgb_sh_tk2$results$Accuracy - coords_valid_xgb_sh_tk2$accuracy
+  acc_sum <- coords_valid_xgb_sh_tk2$accuracy + coords_xgb_sh_tk2$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (abs(acc_diff) < best_acc_diff & acc_sum > best_acc_sum) {
+    best_acc_diff <- acc_diff
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  params
+  best_params
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r xgb sash_tk2, eval=FALSE}
+# Initialize variables to store best results
+best_acc_diff <- 100
+best_acc_sum <- 0
+best_params <- NULL
+
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+tune_grid <- expand.grid(
+  nrounds = c(50,100,200),
+  min_child_weight = c(1,2,5),
+  gamma = c(0),
+  subsample = c(0.6,0.8,1),
+  colsample_bytree = c(0.6,0.8,1),
+  max_depth = c(3,5,7),
+  eta = c(0.1,0.01)
+)
+
+# Pexgborm grid search
+for (i in 1:nrow(tune_grid)) {
+  params <- tune_grid[i, ]
+  
+  tune <- expand.grid(nrounds = params$nrounds,
+            min_child_weight = params$min_child_weight,
+            gamma = params$gamma,
+            subsample = params$subsample,
+            colsample_bytree = params$colsample_bytree,
+            max_depth = params$max_depth,
+            eta = params$eta)
+  
+  tryCatch({
+  # Train the model
+  set.seed(123)
+  xgb_sash_tk2 <- train(ketluan_hoichungdown~., data=train_sash_tk2, method="xgbTree", trControl=trainControl, tuneGrid = tune, metric = "Accuracy")
+  
+  # Make predictions on validation and test data
+  prediction_valid_xgb_sash_tk2 <- predict(xgb_sash_tk2, newdata = valid_sash_tk2, type = "prob")
+  prediction_xgb_sash_tk2 <- predict(xgb_sash_tk2, newdata = test_sash_tk2, type = "prob")
+  
+  # Calculate accuracy for validation and test datasets
+  rp_valid_xgb_sash_tk2 <- pROC::roc(valid_sash_tk2$ketluan_hoichungdown, prediction_valid_xgb_sash_tk2[,1])
+  coords_valid_xgb_sash_tk2 <- coords(rp_valid_xgb_sash_tk2, "best", ret=c("thresashold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  rp_xgb_sash_tk2 <- pROC::roc(test_sash_tk2$ketluan_hoichungdown, prediction_xgb_sash_tk2[,1])
+  coords_xgb_sash_tk2 <- coords(rp_xgb_sash_tk2, "best", ret=c("thresashold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+  
+  # Calculate the sum of accuracies
+  acc_diff <- xgb_sash_tk2$results$Accuracy - coords_valid_xgb_sash_tk2$accuracy
+  acc_sum <- coords_valid_xgb_sash_tk2$accuracy + coords_xgb_sash_tk2$accuracy
+  
+  # Check if this combination of parameters gives a better result
+  if (acc_sum > best_acc_sum) {
+    best_acc_sum <- acc_sum
+    best_params <- params
+  }
+  print(acc_diff)
+  print(best_acc_diff)
+  params
+  best_params
+  cat("Progress:", i, "/", nrow(tune_grid), "\n")
+  }, error = function(e) {
+    # Handle the error here (optional)
+    cat("An error occurred:", conditionMessage(e), "\n")
+  })
+}
+
+# Print the best parameters
+best_params
+```
+
+```{r}
+
+```
+

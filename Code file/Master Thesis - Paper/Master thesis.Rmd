@@ -1,0 +1,3213 @@
+---
+title: " "
+output:
+  pdf_document:
+    
+    number_sections: TRUE
+    
+    fig_caption: yes
+    
+    latex_engine: xelatex
+    
+mainfont: "Times New Roman"
+fontsize: 12pt
+geometry: "paperheight = 29.7cm, paperwidth = 21cm, left = 3.5cm, right = 2cm, top = 3.5cm, bottom = 3cm"
+header-includes:
+  - \usepackage{float}
+  - \usepackage{sectsty}
+  - \usepackage{paralist}
+  - \usepackage{fancyhdr}
+  - \usepackage{setspace}\spacing{1.5}
+  - \usepackage{lastpage}
+  - \usepackage{tocloft}
+  - \usepackage{dcolumn}
+  - \usepackage[square,numbers]{natbib}
+  - \bibliographystyle{abbrvnat}
+  - \usepackage[nottoc, numbib]{tocbibind}
+  - \usepackage{parskip}
+  - \usepackage{indentfirst}
+  - \usepackage{pgf}
+  - \usepackage{amsmath}
+  - \usepackage{booktabs}
+  - \usepackage{graphicx}
+  - \usepackage{longtable}
+  - \usepackage{tabularray}
+  - \usepackage{multirow}
+  - \usepackage{booktabs}
+  - \usepackage{adjustbox}
+bibliography: bibliography.bib
+link-citations: true
+csl: american-medical-association.csl
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, fig.pos = "H", out.extra = "")
+options(tinytex.verbose = TRUE)
+
+setwd("E:/K2meep/Final Project/Thesis/Code")
+
+library(bookdown)
+library(magick)
+library(tidyverse)
+library(data.table)
+library(kableExtra)
+library(Gmisc)
+library(readxl)
+library(dplyr)
+library(caret)
+library(DMwR)
+library(kernlab)
+library(randomForest)
+library(mlbench)
+library(e1071)
+library(mice)
+library(pROC)
+library(themis)
+library(glue)
+library(htmlTable)
+library(grid)
+library(magrittr)
+library(table1)
+library(MLmetrics)
+```
+
+\pagenumbering{gobble}
+
+\counterwithin{figure}{section}
+\counterwithin{table}{section}
+
+\allsectionsfont{\centering}
+\subsectionfont{\raggedright}
+\subsubsectionfont{\raggedright}
+
+\let\oldsection\section
+\renewcommand\section{\clearpage\oldsection}
+
+\renewcommand\cfttoctitlefont{\hfill\Large\bfseries}
+\renewcommand\cftaftertoctitle{\hfill\mbox{}}
+
+\setlength{\parindent}{40pt}
+
+\setcounter{tocdepth}{5}
+
+\newpage
+\cftsetindents{section}{0em}{2em}
+\cftsetindents{subsection}{0em}{2em}
+
+\newpage
+
+\begin{centering}
+
+{\bf MINISTRY OF EDUCATION AND TRAINING \hfill MINISTRY OF HEALTH}
+
+{\bf HANOI MEDICAL UNIVERSITY}
+
+\vspace{3cm}
+
+```{r front page uni_logo, echo=F, out.width="50%"}
+knitr::include_graphics("HMU logo.png")
+```
+
+\vspace{1cm} \Large
+{\bf Huy Do Duc}
+
+\vspace{1cm} \Large \doublespacing
+{\bf APPLY MACHINE LEARNING MODELS \\IN PRENATAL SCREENING FOR DOWN SYNDROME \\AT HANOI MEDICAL UNIVERSITY HOSPITAL}
+
+\vspace{1.5 cm}
+
+{\bf MASTER THESIS IN EPIDEMIOLOGY}
+
+\vspace{1.5 cm} \Large
+
+{\bf HANOI - 2023}
+
+\end{centering}
+
+\newpage
+
+\begin{centering}
+
+{\bf MINISTRY OF EDUCATION AND TRAINING \hfill MINISTRY OF HEALTH}
+
+{\bf HANOI MEDICAL UNIVERSITY}
+
+\vspace{0.5cm}
+
+```{r next front page uni_logo, echo=F, out.width="50%"}
+knitr::include_graphics("HMU logo.png")
+```
+
+\vspace{0.5cm} \Large
+{\bf Huy Do Duc}
+
+\vspace{0.5cm} \Large \doublespacing
+{\bf APPLY MACHINE LEARNING MODELS \\IN PRENATAL SCREENING FOR DOWN SYNDROME \\AT HANOI MEDICAL UNIVERSITY HOSPITAL}
+
+\vspace{0.5 cm}
+
+{\bf Major: Epidemiology \\Code: 8720117}
+
+\vspace{1 cm}
+
+{\bf MASTER THESIS}
+
+\vspace{1 cm}
+
+{\bf Supervisor \\Giang Le Minh \\Trang Nguyen Thi}
+
+\Large
+
+{\bf HANOI - 2023}
+
+\end{centering}
+
+\tableofcontents
+
+# Abbreviation {-}
+
+\begin{centering}
+
+```{r abbreviation, echo=FALSE}
+abbreviation <- data.frame(Abbreviation = c("AI", "ANNs", "AFP", "uE3", "HCG", "PAPP-A", "NIPT", "KNN", "SVM", "RF", "MLP", "XGBoost"),
+                           Explaination = c("Artificial intelligence", "Artificial Neural Networks", "Maternal Serum Alpha-fetoprotein", "Maternal serum Estriol", "Human Chorionic Gonadotropin", "Pregnancy-associated Plasma Protein A", "Non-invasive Prenatal Screening", "K-nearest neighbor", "Support Vector Machine", "Random Forest", "Multilayer Perceptron", "Extreme Gradient Boosting"))
+
+abbreviation %>%
+  kbl(align = "c", booktabs = TRUE)
+```
+
+\end{centering}
+
+\newpage
+
+\listoftables
+
+\newpage
+
+\listoffigures
+
+# **Introduction** {.unnumbered}
+
+\pagenumbering{arabic}
+
+Down syndrome (DS) is a congenital defect caused by an extra 21\textsuperscript{st} chromosome [@cdc_facts_2021].
+This is the most common chromosomal disorder in the US that appears in 1 in every 700 babies and approximately 250,700 people were living with Down syndrome in the US in 2008 [@presson_current_2013].
+Children with Down syndrome have a higher risk of diseases such as congenital heart disease [@park_down_1977], deafness [@roizen_hearing_1993, @shott_hearing_2001], ear infections, lung infections [@ram_infections_2011] and autism [@reilly_autism_2009] leading to high mortality rates and reduced life expectancy.
+This syndrome not only affects the children themselves, but also causes significant economic and emotional burdens on the family and society.
+Children with Down syndrome have greater unmet needs than other children with special health care needs [@mcgrath_national_2011] and the cost of caring for a child with Down syndrome aged zero to four is four times higher than the cost of caring for a child of the same age without the syndrome [@boulet_health_2008].
+Currently, there is no cure for Down syndrome [@cdc_facts_2021].
+Prenatal and early screening is necessary for the early detection of Down Syndrome so that the mother can make appropriate decisions for the baby, including early cochlear implantation, heart surgery, and respiratory support [@choi_decision_2012].
+
+If a fetus is suspected to have Down syndrome when the mother's age is greater than 35 years [@erickson_down_1978] or there's thick nuchal translucency detected through ultrasonography [@pandya_first-trimester_1994], screening methods are implemented to calculate the woman's risk of delivering a child with DS.
+Currently, there are various methods of risk assessment for Down syndrome.
+Among them, Non-Invasive Prenatal Testing (NIPT) has the highest sensitivity and specificity, up to 99% [@mersy_advantages_2015].
+However, NIPT is more expensive than other screening methods (ranging from 3 to 6 million Vietnamese Dong) to be adopted as a universal screening program .
+Alternative methods including double and triple tests, but with lower sensitivity and specificity, ranging from 85-90%, are being used widely [@schiott_consecutive_2006].
+
+In recent years, with the expansion of artificial intelligence (AI) to all areas of science that use available medical data efficiently to build decision support systems [@shailaja_machine_2018], there are also new AI-based methods for the early detection of Down syndrome.
+Machine learning is the most important part of AI, it gives computer systems the ability to learn automatically.
+A well-developed machine learning model can achieve sensitivity above 95% and higher with more data, higher than current screening methods in Vietnam, which are double and triple tests.
+For example, Neocleous et al developed a machine learning model with 100% sensitivity for Down syndrome based on three different data sets with a total of 122,362 aneuploidies and 967 malformations [@neocleous_first_2016].
+Machine learning models can be implemented as a mobile app or a website, so prenatal screening using this method only requires a smart device that can access the software.
+So unlike NIPT, it is a cheap and easy-to-use method that can be used everywhere at any time.
+Therefore, we can apply this screening method in medical facilities at any level of the healthcare system in Vietnam, especially at the commune level, where there are no trained specialists in genetics.
+This new method will help to increase the rate of pregnant women who can access the screening program and contribute to reducing the frequency of undetected babies with Down syndrome in Vietnam.
+
+There have been many machine learning models that screen for Down Syndrome in the fetus but they are all built based on a non-Vietnamese population.
+So we need machine learning models that are based solely on data from pregnant Vietnamese women to screen for Down syndrome in Vietnamese women.
+This study is part of a national-level study entitled "Research to build an artificial intelligence system to support prenatal screening for some common abnormalities in Vietnam". It aims to increase the proportion of pregnant women being screened for abnormalities in the community.
+In the parent study, we developed four models to screen for Down Syndrome in the first and second trimester based on data from pregnant women at Vietnam National Hospital Of Obstetrics and Gynecology, with the final outcome as the risk of having Down Syndrome determined by experts.
+
+In this study, in order to adapt to real life setting which might not have the test results required for this screening method, we wanted to use 3 different combinations of variables in each trimester to build prediction models for Down Syndrome, which were combination of ultrasound test results only, combination of biochemical tests result only, or both the combination of ultrasound and biochemical test results, and then compare them to find the best model with the highest sensitivity, specificity as well as the least amount of information required. The outcome variable was determined as whether the fetus had Down Syndrome decided by amniocentesis test.
+
+Thus,we conduct this study with two objectives:
+
+Objective 1: Describe the process of making machine learning models in prenatal screening for Down Syndrome using data of pregnant women collected from Vietnam National Hospital Of Obstetrics and Gynecology.
+
+Objective 2: Assess the sensitivity and specificity of machine learning models in prenatal screening for Down Syndrome on data of pregnant women collected from Hanoi Medical University Hospital to find the most appropriate model.
+
+# **Chapter 1: Literature Review**
+
+## **Down Syndrome**
+
+### **Overview**
+
+Down Syndrome, is one of the most common chromosomal conditions.
+It occurs in about 1 in 800 births worldwide.
+In the United States, Down Syndrome is found in 500 live births annually and more than 200,000 people are living with the condition.
+Down Syndrome was first found and described by John Langdon Down, a physician from Cornwall, England.
+More than 90 years later, the chromosomal cause was delineated and the condition was named Down Syndrome.
+
+The potential for the development and socialization of persons with DS has been increasingly realized, and early support for affected children and their families is widely implemented, although the disparity in access to health care and other supportive resources still exists.
+There is considerable phenotypic variation among patients, and intellectual disability is most commonly moderate but ranges from mild to severe, whereas social function is often high relative to cognitive impairment.
+There are also differences in the incidence and presentation of Down Syndrome according to ethnic background and geographic region.
+
+### **Genetic Feature of Down Syndrome**
+
+Down syndrome is thought to be caused by an extra chromosome 21 in the genome, also known as trisomy 21 or trisomy 21.
+Trisomy 21 is the most common inherited chromosomal disorder that occurs when a child is born with an extra copy of chromosome 21 during pregnancy.
+In all cases of normal reproduction, both parents pass on genes to their offspring, which are carried in chromosomes.
+As the baby's cells grow, each cell must receive 23 pairs of chromosomes from the mother and 23 from the father, for a total of 46 chromosomes.
+In children with Down syndrome, one of the chromosomes does not separate properly.
+Babies end up with three copies, or one extra copy of chromosome 21, instead of two.
+Thus, the fetus has 47 chromosomes due to an extra chromosome number 21.
+It is this "excess" chromosome that disrupts normal physical and intellectual development, causing physical and mental disorders.
+children's intelligence.
+
+### **Prenatal screening methods**
+
+#### **Ultrasound**
+
+Ultrasound is a non-invasive procedure that does not harm both the mother and the fetus, which allows clinicians to gather some information about the pregnancy that cannot be provided by any examination such as gestational age, number of fetuses, fetal development, mother-to-child metabolism quality (based on Doppler) and fetal morphology.
+Although there have been many technical improvements, ultrasound is still not the perfect method, it can only detect some fetal malformations when the fetus is in a favorable position with the right amount of amniotic fluid.
+Unclear morphological abnormalities are also difficult to detect on ultrasound.
+In Down Syndrome, ultrasound can only detect indirect images such as nuchal translucency.
+
+Ultrasound for the measurement of nuchal translucency is usually done at 11-13 weeks of pregnancy which will give the most accurate results.
+The majority of cases with nuchal translucency \< 3 mm were classified as low-risk (less likely to develop chromosomal abnormalities).
+In the case when nuchal translucency is ranged from 3.5 to 4.4 mm, there is a chromosomal abnormality rate of 21.1% and in the case which it is \>= 6.5 mm, the risk of chromosomal abnormality can be increased up to 64.5%.
+In cases where nuchal translucency is \> 3 mm, the pregnant woman will be ordered to perform an additional triple test at 16-18 weeks.
+
+#### **Double test, Triple test**
+
+The first Down syndrome screening method was introduced in the 1970s based on maternal age.
+women over 40 years old will be given an amniocentesis test to determine the risk of fetuses with chromosomal abnormalities.
+Later, when amniocentesis becomes safer than before with the guidance of ultrasound, the cost is also reduced, amniocentesis is widely indicated in high-risk pregnant women, ie older than or equal to 35 years old.
+
+-   **Maternal serum alpha-fetoprotein (AFP)**
+
+A developing fetus has 2 main types of blood protein, Albumin and alpha fetoprotein (AFP) while an adult has only albumin, so an AFP test in the maternal serum is used to indirectly determine the amount of AFP in the fetal blood.
+
+Normally only a small amount of AFP in the amniotic fluid can cross the placenta to enter the mother's bloodstream.
+However, when there is a neural tube abnormality, because part of the embryonic neural tube is not closed, AFP will escape into the amniotic fluid.
+Neural tube abnormalities include anencephaly (due to the neural tube that does not close the head) and spina bifida (due to the inability of the tail of the neural tube).
+In the US, the rate of these diseases is 1-2/1000 births.
+Likewise, in gastroschisis or omphalocele, AFP from the fetus enters mother's bloodstream in a larger amount than usual.
+
+AFP tends to be lower than normal in fetuses with Down syndrome or some chromosomal abnormalities, so AFP is useful in screening for Down syndrome and several other infections.
+A combination of AFP screening and ultrasound can detect almost all anencephaly and most cases of spina bifida.
+
+-   **Maternal serum free Beta-HCG**
+
+This is the most commonly used test during pregnancy.
+About 1 week after the embryo implants in the uterus, the amount of beta HCG secreted by the culturing cells is sufficient to diagnose pregnancy.
+In the early stages of pregnancy, beta HCG helps in early diagnosis and prognosis of miscarriage, ectopic pregnancy because in these cases, beta HCG is lower than normal.
+
+Later in pregnancy, at the end of the second trimester, HCG may be used in combination with AFP to screen for specific chromosomal abnormalities in Down syndrome.
+Increased HCG in association with decreased AFP is an implication of Down syndrome.
+Meanwhile, abnormally high hCG suggests pseudocyesis.
+
+```{r fig1, fig.cap="Maternal age-related risk for trisomy 21 at 12-week gestation and maternal serum b-hCG levels (left) and PAPP-A (right)", fig.align = "center", echo=FALSE}
+knitr::include_graphics("fig1.jpg")
+```
+
+-   **Maternal serum Estriol (uE3)**
+
+Estriol is derived from dehydroepiandrosterone (DHEA) which is produced from the adrenal glands and then converted to estriol by the placenta.
+Estriol enters the mother's bloodstream and is excreted in the urinary tract or excreted by the liver into the bile.
+Continuous testing of estriol in the third trimester is performed to monitor fetal health status.
+If the concentration of estriol is reduced, the fetus is at risk and may indicate an end to pregnancy.
+Estriol is also reduced in fetuses with Down syndrome or adrenal insufficiency or anencephaly.
+
+-   **Pregnancy-associated plasma protein A (PAPP-A)**
+
+In the first trimester, low serum PAPP-A is an indication of trisomies 13, 18 and 21.
+Furthermore, low PAPP-A levels in the first trimester predict a low birth weight pregnancy or stillbirth.
+A higher than normal PAPP-A suggests a larger than normal fetus.
+A combination of serological tests can potentially increase the sensitivity and specificity of detecting fetal abnormalities.
+The classic 3 screening tests includes alpha-fetoprotein (MSAFP), beta-HCG, and estriol (uE3).
+Some facilities use fourth tests, which is inhibin-A.
+
+```{r table1, echo=FALSE}
+table1 <- cbind(data.frame(Syndrome = c("Neural tube defects", "Trisomy 21", "Trisomy 18"),
+                           AFP = c("High", "Low", "Low"),
+                           uE3 = c("Normal", "Low", "Low"),
+                           HCG = c("Normal", "High", "Low")))
+
+table1 %>%
+  kbl(align = "c", caption = "Diagnosis of abnormalities using AFP, uE3 and HCG", booktabs = TRUE) %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+#### **Non-invasive prenatal screening (NIPT)**
+
+This is considered to be the most effective and safest testing method available today.
+The method is performed early from the 10th week of pregnancy through the mother's blood sample (only 7-10 ml).
+Chromosome abnormalities can be screened including chromosome 6, 9, 13 (Patau's syndrome), chromosome 18 (Edwards), chromosome 21 (Down), chromosome X, Y, and segmental mutations, etc.
+In addition, this method is also applicable for single pregnancy, twins, surrogacy with high accuracy, up to 99.98%.
+
+### **Down Syndrome diagnosis method**
+
+#### **Amniocentesis (golden standard of this study)**
+
+Amniocentesis is the most widely used method today because of its technical simplicity as well as a low rate of complications.
+It is considered the main method of obtaining fetal specimens.
+
+Amniocentesis is done in 3 periods: Early amniocentesis (13 to 16 weeks gestation), classic amniocentesis (from 17 to 20 weeks gestation), late amniocentesis (after 20 weeks ).
+
+The best gestational age for this procedure is 17 to 18 weeks because at this time the chance to successfully draw out amniotic fluid is highest while the rate of complications for both mother and fetus is lowest.
+The procedure is performed under ultrasound guidance.
+
+#### **Chorionic Villus Sampling**
+
+Chorionic villus sampling (CVS), or chorionic villus biopsy, is a prenatal test that involves taking a sample of tissue from the placenta to test for chromosomal abnormalities and certain other genetic problems.
+This method causes a high rate of miscarriage (about 9%), so it is only used mainly in cases of fetuses with severe abnormalities detected in the first trimester.
+This method is performed under ultrasound guidance.
+Results will be available after 5 to 7 days.
+
+## **Artificial Intelligence (AI)**
+
+### **Definition**
+
+Artificial Intelligence, also known as AI, is the intelligence expressed by machines, different from the natural intelligence expressed by humans or animals, which are related to consciousness and emotions.
+In other words, artificial intelligence is a branch of computer science whose purpose is to give the software the ability to analyze information, then make decisions based on results.
+
+### **Machine learning**
+
+Machine learning is the most important part of AI, it gives computer systems the ability to learn automatically.
+Machine learning can be understood as the process by which a system "learns" itself from past experiences and converts those "lessons" into its knowledge, instead of using knowledge obtained by humans.
+
+Currently, two definitions of machine learning method have been proposed.
+The first definition by Arthur Samuel describes this approach as "the field of study that gives computers the ability to learn without being explicitly programmed." This is the old and unofficial definition.
+Instead, Tom Mitchell proposed a more modern definition: "A computer program is said to learn from experience E with respect to some class of tasks T and performance measure P if its performance at tasks in T, as measured by P improves with E".
+For example, in computer-based chess, where E is the experience from playing previous games, T is the task of playing chess, and P is the probability that the software will win the next time it is played.
+
+Any machine learning method can be categorized into one of two types: supervised learning or unsupervised learning.
+
+#### **Supervised learning**
+
+As children, we learned to classify new things under the guidance of adults.
+They point at a furry four leg creature that bark and tell us that it is a dog.
+Through many such instructions, we get to know how to identify a dog among other animals.
+This is the core concept of supervised machine learning.
+In this method, the software is given a data set and already knows what the correct output should look like, having the idea that there is a relationship between the input and the output.
+The task of a supervised machine learning mechanism is to try to find the relationship between the input data and the desired output, and then use that relationship to predict the output for the new input.
+
+The advantage of the supervised machine learning method is that it can find out the correlation between input and output data that is close to reality and has good coverage of different cases.
+However, the disadvantage of machine learning methods is that large input data is required, and the data must be pre-labeled, which can be expensive in terms of time and money.
+In addition, in order to have good coverage of the different cases, the input data must be diverse and need to be updated continuously, because although it is called a cat, the cats in different places are different in shape, size, color, and sometimes we have to ask ourselves if it's a cat, which is the same in this machine learning approach.
+
+```{=tex}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=1\textwidth, height=1\textheight]{fig2.png}
+\caption{Example of a supervised learning system}
+\end{figure}
+```
+
+#### **Unsupervised learning**
+
+Unsupervised machine learning is used when we know little or not what the outcome will be.
+While in supervised machine learning, we try to build a predictive model based on labeled input data, in the unsupervised learning method, instead of available labeled data, the model collects data from the environment and labels them itself, just like children who can imitate the actions of adults, classifying other animals by themselves, or come up with rules of a game based on observations.
+
+The advantage of the unsupervised machine learning approach is that it does not need labeled data, and it can provide unknown information from the input data, as well as automatically classify the data by finding different characteristics from the data itself.
+However, this method has disadvantages such as it takes many steps to build, and it is difficult to understand what is going on inside the software or what method it is using to learn.
+
+### **Machine learning algorithms**
+
+#### **K nearest neighbor (kNN)**
+
+K nearest neighbor (or kNN) is one of the simplest supervised machine learning algorithms mostly used for classification.
+It classifies an observation based on how its neighbors are classified.
+
+```{=tex}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.5\textwidth, height=0.5\textheight]{fig3.png}
+\caption{Example of kNN algorithm}
+\label{fig:fig3}
+\end{figure}
+```
+
+Figure \ref{fig:fig3} presents an example of kNN algorithm with 3 different categories (or "class" in machine learning language).
+In this example, there are the most observations in the 3\textsuperscript{rd} group in the area we call "neighbor" (k in kNN is the number of observations in this area so the more k the larger the area) so we can predict that the unknown observation belongs to the 3\textsuperscript{rd} group.
+Thus, kNN algorithm is easy to use and it adapts easily to new data, but its accuracy falls when we need a large number of variables to classify.
+
+#### **Random forest (RF)**
+
+Random forest (RF) is a method that operates by constructing multiple Decision Trees during training phase.
+The Decision of the majority of the trees is chosen by the random forest as the final decision.
+
+```{=tex}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=1\textwidth, height=1\textheight]{fig4.png}
+\caption{Example of Random Forest}
+\label{fig:fig4}
+\end{figure}
+```
+
+Figure \ref{fig:fig4} shows an example of RF algorithm in classifying if this fruit is cherry or orange.
+There are multiple decision trees, each with its own parameters and conditions.
+In the end, the majority of decision trees classify that this fruit is orange so the final conclusion of this algorithm is orange.
+Because of many decision trees with different parameters and conditions, RF can maintain accuracy when there is missing data but it is also more complex and requires more computing power than other machine learning algorithms.
+
+#### **Support vector machine (SVM)**
+
+Support Vector Machine (SVM) algorithm construct a hyperplane (red line in figure 5) where the distance between two groups of data points is at its maximum.
+This hyperplane is known as the decision boundary, separating the groups of data points (e.g., oranges vs. apples) on either side of the plane.
+
+```{=tex}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.5\textwidth, height=0.5\textheight]{fig5.png}
+\caption{Example of Support Vector Machine}
+\label{fig:fig5}
+\end{figure}
+```
+
+#### **Extreme Gradient Boosting (XGBoost)**
+
+Extreme Gradient Boosting algorithm is an implementation of gradient boosted decision trees.
+Both XGBoost and RF combine the outputs from individual trees but these two algorithm differ in the way individual trees are built and in the way the results are combined.
+In RF, we build independent decision trees and combine their result in parallel while XGBoost combines the result sequentially so that each new tree corrects the error of the previous tree.
+The first step is to fit a single decision tree then evaluate how well this tree does in classifying the data.
+Then we add the second tree that its performance better than the first tree alone.
+Then we keep adding trees until a point that when we add new trees, the performance of the whole system stops increasing.
+
+### **AI application in health care**
+
+In the clinical setting, AI is often used to build clinical decision support system.
+Clinical decision support systems have the responsibility of assisting physicians or healthcare professionals in making clinical decisions.
+These systems can improve the quality of healthcare by providing references to doctors based on data from the past.
+
+Clinical decision support systems have been developed since the 1970s, such as the MYCIN, INTERNIST-1 and CASNET.
+Decision support systems have been developed and applied in many fields of healthcare such as diagnosing diseases, developing treatment regimens, making drugs, monitoring and taking care of patients, ... These systems have been applied in many facilities around the world.
+AI algorithms in healthcare have been developed by many companies, including large companies such as IBM, Microsoft, Google, Intel, Facebook and even startups.
+In recent years, the development and application of clinical decision support systems have been increasingly strengthened.
+There are many reasons for this development, that is the development of hardware leading to increased computing power, shortening the time to collect and process data; the volume of medical-related data collected from medical and personal devices increasing; development of genetic databases; electronic medical record management systems are becoming more and more popular; development of highly accurate advanced AI techniques (such as deep learning methods) in the fields of computer vision and natural language processing enhances the accuracy of AI system.
+
+### **Studies applying AI in prenatal screening for Down syndrome**
+
+The Fetal Medicine Foundation's algorithm is being used widely in prenatal screening for Down Syndrome.
+Many studies were conducted to measure the efficiency of this software.
+A study conducted by Kevin Spencer in a population of 30 cases of Down syndrome and 11758 unaffected pregnancies concluded that risks produced by the Fetal Medicine Foundation agree very closely with Down syndrome prevalence with the correlation coefficient being 0.9995 [@spencer_accuracy_2002].
+Another study by Stephen P.O.
+et al on 8 cases of Down Syndrome in 1000 fetuses yielded 75% sensitivity [@ocallaghan_first_2000].
+
+Not only test AI models that already built, many studies use novel methods to build their own models.
+Falin He et al built an AI software on 58923 negative Down syndrome cases and 49 Down syndrome cases and test this software on a data set of 27,143 negative Down syndrome cases and 27 Down syndrome cases from other hospital, which achieved 85.2% sensitivity and 95% specificity [@he_machine_2021].
+
+Neocleous used artificial neural networks to assess the risk of multiple aneuploidies, Down syndrome and other aneuploidy mutations [@neocleous_intelligent_2017; @neocleous_first_2016].
+The authors introduced a non-invasive diagnostic procedure for fetal malformations in early pregnancy, by proposing a method using an artificial neural network trained with data from single pregnancies in first-trimester screening.
+Three different data sets with a total of 122,362 euploids and 967 malformations were used.
+Data for each case contained markers collected from the mother and fetus.
+The proposed artificial neural network models have been optimized in the sense of achieving a minimum false positive rate and at the same time guaranteeing a 100% sensitivity for Down syndrome.
+These systems also accurately identify other malformations (Edwards, Patau, Turner and Triploid syndromes) achieving sensitivity greater than 80%.
+The results of the study demonstrate that artificial neural network systems can support effective, non-invasive early screening for fetal malformations with better outcomes than other currently available methods.
+
+Some other studies applied techniques such as Fuzzy Cognitive Maps, logistic regression, a two-stage approach to diagnose the risk of Down syndrome and neural tube defects [@papaioannou_non-invasive_2016; @khattak_predicting_2019; @neocleous_two-stage_2018-1].
+
+Catic et al used two neural network architectures to classify five prenatal syndromes (Turner, Klinefelter, Patau, Edwards, and Down) based on maternal serum screening test results.
+ultrasound and patient demographics [@catic_application_2018].
+The purpose of this work is to test the effectiveness of different neural network architectures for this task.
+This study demonstrated that relatively simple neural network architectures, such as feedforward, can have high classification accuracy.
+Because of the non-linear input-output relationship, the classification accuracy can be better achieved with a recursive neural network architecture, such as the Elman neural network.
+The feedforward neural network with 15 neurons in the hidden layer achieved a classification sensitivity of 92.00%.
+The classification sensitivity of the Elman neural network is 99.00%.
+The average accuracy of the feedforward neural network is 89.6% and the response is 98.8%.
+Koivu et al studied, tested, and evaluated machine learning algorithms to improve the performance of Down syndrome screening during the first trimester of pregnancy.
+Machine learning algorithms pose an adaptive alternative to developing better risk assessment models using existing clinical variables [@koivu_evaluation_2018-1].
+The best performing deep neural network model gave an area under the curve of 0.96 and detection rate of 78% with 1% false positive rate with the test data.
+Support vector machine model gave area under the curve of 0.95 and detection rate of 61% with 1% false positive rate with the same test data.
+
+Li et al. propose a cascading machine learning framework designed to predict Down syndrome based on three additional stages: 1) pre-judgment with isolation forest technique, 2) model ensemble by voting strategy, and 3) final judgment using logistic regression approach.
+The test results show that the performance of this framework on the maternal serum screening data set, when evaluated with different evaluation parameters, outperforms some machine learning methods [@li_down_2019].
+The best suggested combination of input features for Down screening are alpha-fetoprotein (AFP) group, human chorionic gonadotropin (hCG), unconjugated estriol (uE3), and maternal age.
+In addition, the method proposed by the authors is capable of producing even more accurate predictions for the data.
+
+## **Evaluate the effectiveness of artificial intelligence software**
+
+### **Data set and models evaluation**
+
+Model evaluation is usually performed on data that the model has never been learned from -- on validation sets and test sets.
+Different problems will have different evaluation criteria.
+A data set has 3 functions: model training, model fine-tuning and model evaluation.
+The data set also has 3 parts: training set, validation set and test set.
+
+Machine Learning models are trained based on data.
+The more "good" data is fed into the model, the more accurate the model's predictions.
+Therefore, most of the data in the data set are used to train the model, and this piece of data is called the training set.
+On the other hand, there is a need for a piece of data to evaluate the "learning" of the model, then we need a test set.
+The data in the test set should be new, never been "learned" or "seen" by the model, and close to the actual data.
+The test set acts as a sample with population being the actual data of the problem being solved, or the data in the test set having the same distribution as the actual data.
+Therefore, the model results shown on the test set are a reliable measure of the actual performance of the model.
+Assuming you want to recognize license plates in night shots, the test set should now be pictures were taken at night (same distribution with actual data) instead of those taken in good lighting conditions.
+At this time, the results of the model on the test set will be more reliable when the test set contains an image that is not close to the actual problem to be solved.
+
+During model training, there will be cases where the model is overfitting with the training data.
+Simply put, overfitting is a phenomenon where the model performs well when evaluated on the training set but does not perform well on the test set.
+Therefore, we need to calibrate the model (fine tune the hyper parameters) to improve the evaluation results on the test set.
+At this point, we need a data set that the model has never been "learned" or "seen" before, for "early warning" about problems that the model may encounter when exposed to the data.
+reality (like underfitting or overfitting).
+So this data set must be distributed with test set or actual data, and it is called validation set or development set.
+A question arises: Is it possible to use the test set as a validation set?
+The use of test sets to calibrate the model is not recommended in practice in order to keep the "unseen" nature of the test set.
+If the model is improved from the test set in order to "fit" better with the test set itself, the model tends to overfit with the test set, reducing the reliability of the evaluation results on the test set.
+
+### **Evaluation parameters**
+
+#### **Accuracy**
+
+Accuracy (accuracy) simply measures how often the model correctly predicts.
+Accuracy is the ratio between the number of correctly predicted data points and the total number of data points:
+
+```{=tex}
+\begin{center}
+$accuracy = \frac{number\ of\ corrected\ predictions}{number\ of\ total\ data\ points}$
+\end{center}
+```
+
+However, a model with high accuracy is not necessarily good.
+Accuracy exposes its limitations when used on an unbalanced data set.
+We have the following example:
+
+We want to screen for Down syndrome in fetuses of pregnant women.
+We can collect data from 10,000 pregnant women but only 10 cases with Down syndrome fetuses.
+It is easy to see that, as long as the model always predicts that all pregnant women are normal, the model has an accuracy of 99.9%.
+However, in practice your model cannot detect pregnant women with Down.
+Therefore, our data set is imbalanced, so relying on accuracy to evaluate the model does not bring many positive results.
+
+#### **Confusion Matrix (2x2 table)**
+
+The disadvantage of Accuracy is that it only tells us the accuracy of the model's prediction, but it does not show how wrong the model is predicting, so we need another evaluation method - Confusion Matrix.
+Confusion matrix is a technique for evaluating model performance for classification problems.
+Confusion matrix is a matrix that represents the number of data points that belong to a class and are predicted to belong to the class.
+
+In order to classify whether a pregnant woman has a fetus with birth defects, we have to answer a yes or no question, or in other words, positive or negative.
+There are 4 possibilities when comparing the software's prediction with fetus's true condition.
+If the prediction says that this case is positive and in fact this person is positive, this is called a true positive, but if in fact this person is negative, it is called a false positive.
+Conversely, true negative occurs when both the prediction and fetus's true condition are negative, and false negative occurs when the prediction is negative when in fact it is positive.
+We can draw this table from the explanation above:
+
+```{=tex}
+\begin{table}[ht]
+\centering
+\caption{Confusion Matrix}
+\label{tab:confusion_matrix}
+\begin{tabular}{lcc}
+\hline
+& Predicted Positive & Predicted Negative \\
+\hline
+Actual Positive & True Positive & False Negative \\
+Actual Negative & False Positive & True Negative \\
+\hline
+\end{tabular}
+\end{table}
+```
+
+The sensitivity (sometimes also named the detection rate in a clinical setting) of the software is the proportion of fetuses which test positive for birth defects among those which truly have the condition.
+Mathematically, this can be expressed as:
+
+```{=tex}
+\begin{center}
+Sensitivity = $\frac{True\ Positive}{True\ Positive\ +\ False\ Negative}$
+\end{center}
+```
+
+Specificity of the software is the proportion of fetuses which test negative for birth defects among those which truly do not have the condition.
+Mathematically, this can also be written as:
+
+```{=tex}
+\begin{center}
+Specificity = $\frac{True\ Negative}{True\ Negative\ +\ False\ Positive}$
+\end{center}
+```
+
+Finally, accuracy is the combination of true positive and true negative cases among the total population.
+Mathematically, this can also be written as:
+
+```{=tex}
+\begin{center}
+Accuracy = $\frac{True\ Positive\ +\ True\ Negative}{True\ Positive\ +\ True\ Negative\ +\ False\ Positive\ +\ False\ Negative}$
+\end{center}
+```
+
+#### **ROC curve**
+
+In classification problems, classification algorithms often predict the score or probability of belonging to a class of input data.
+This helps us to know the certainty of the model when classifying.
+After predicting probabilities or scores, it is necessary to convert those values to the labels of the classes.
+The transition from probabilities, scores to labels is determined by a threshold.
+The output of Logistic Regression is the value of the sigmoid function:
+
+```{=tex}
+\begin{center}
+\Large
+$\sigma(x) = \frac{1}{1+e^{-x}}$
+\end{center}
+```
+
+The value of $\sigma(x)$ is in [0,1], representing the probability that the input data point belongs to the positive class.
+To convert the probability to the class label, we need to determine the threshold value.
+The default threshold value is 0.5, which means:
+
+If S(x) \> threshold (0.5), the output of the model is 1
+
+If S(x) \< threshold (0.5), the output of the model is 0
+
+The problem is that sometimes default threshold = 0.5 is not the best classifier "threshold", this happens when the classes of the problem are not balanced (predicting a rare disease with extremely low probability), or the priority of one type of error is higher than the other, and so on.
+Therefore, sometimes we need to change the threshold for the model to achieve the desired results.
+ROC curve is a tool to choose the appropriate threshold for the model.
+For each threshold value, we obtain two values represented on the ROC curve:
+
+-   True Positive Rate (TPR or Sensitivity - Recall): is the sensitivity of the model, indicating how accurate the prediction is in the positive class.
+    TPR is the quotient of the number of correctly predicted data points in the positive class with the number of data points in the positive class.
+
+-   False Positive Rate (FPR): is the probability of getting Type II Error Where, Specificity indicates the accuracy of the prediction in the negative class.
+
+```{=tex}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.5\textwidth, height=0.5\textheight]{fig6.png}
+\caption{ROC Curve}
+\label{fig:fig6}
+\end{figure}
+```
+
+The orange points represent each threshold, where the vertical axis is the TPR value and the horizontal axis the FPR value.
+Connect the orange points to get the ROC curve.
+The blue dashed line represents the results of the "no skill model" -- the model predicts by randomizing the results.
+It should be noted that the lower the FPR value, the lower the probability of having a Type II Error, so the points on the left should be considered more if we need to minimize False Negative (Type II Error).
+On the other hand, the higher the points lie, the larger the TPR.
+Depending on the problem to choose a point -- corresponding to a suitable threshold.
+
+# **Chapter 2: Subjects And Research Methodology**
+
+## **Description of the parent study**
+
+The parent study, entitled "Research to build an artificial intelligence system to support prenatal screening for some common abnormalities in Vietnam", was a cross-sectional study conducted to build expert systems and machine learning models to screen for four abnormalities in Vietnam: thalassemia and three trisomies which were Down, Edward, Patau syndrome.
+
+### **Study date and time**
+
+This study was conducted at Vietnam National Hospital Of Obstetrics and Gynecology and Hanoi Medical University Hospital from September 2020 to March 2023.
+
+### **Study participants**
+
+Data was collected from the medical records of pregnant women who visited the National Hospital of Obstetrics and Gynecology from January 2012 to December 2022 were included. In order to test built models using external data, medical records of pregnant women examined at Hanoi Medical University Hospital, Hanoi Obstetrics and Gynecology Hospital and the National Hospital of Obstetrics and Gynecology were collected.
+
+Eligible participants were pregnant women who had either ultrasound test results, total peripheral blood cell analysis, prenatal screening test results (double or triple test), serum iron and ferritin test results, hemoglobin electrophoresis test results and chromosome and/or thalassemia gene test results (in high-risk cases). We excluded those with multiple pregnancies or IVF pregnancies.
+
+### **Sample size and sampling methods**
+
+We used convenient sampling method to collect data.
+We collected over 12000 records of pregnant women from Vietnam National Hospital Of Obstetrics and Gynecology and used this data set to build machine learning models.
+
+### **Variables used to build machine learning models**
+
+26 variables were used to build machine learning models including 2 double test indices: MoM-hcgb and MoM-papp-a, 3 triple test indices: MoM-ue3, MoM-afp and MoM-hcg, 17 ultrasound test indices: nuchal translucency, fetal crown-rump length, biparietal diameter, Cerebellum size, Posterior Cranial Fossa size, Lateral Ventricles size, Choroid Plexus Cyst appearance (yes; no), Fetal has nose (yes; no), nose length, length between eyeballs, abdominal circumference, abdominal diameter, normal kidneys (yes; no), open hand sign (yes; no), femur length, normal placenta (yes; no), normal amniotic fluid (yes; no).
+The outcome variable is whether the fetus has risk of Down Syndrome by experts.
+
+### **Data collection tools in each hospital**
+
+```{=tex}
+\begin{table}
+\centering
+\caption{Testers in each hospital}
+\label{testers}
+\begin{tblr}{
+  width = \linewidth,
+  colspec = {Q[85]Q[167]Q[258]Q[194]Q[237]},
+  cell{3}{1} = {r=2}{},
+  cell{5}{1} = {r=2}{},
+  vlines,
+  hline{1-3,5,7} = {-}{},
+  hline{4,6} = {2-5}{},
+}
+            &                                & National Hospital Of Obstetric and Gynecology                  & Hanoi Medical University Hospital & Hanoi Obstetrics and Gynecology Hospital       \\
+Ultrasound  &                                & {- Voluson E6 (GE)\\ - Samsung HS60\\ - Samsung A80 (Samsung)} & - Voluson S10 (GE)                & {- Voluson E6 (GE)\\ - Samsung HS60 (Samsung)} \\
+Biochemical & Double/Triple test             & Autodelfia (PerkinElmer)                                       & Immulite 2000 (Seimens)           &                                                \\
+            & Serum Iron/Ferritin            & Cobas E801 (Roche)                                             & Cobas E801 (Roche)                & Cobas E601 (Roche)                             \\
+Blood test  & Peripheral blood cell analysis & Cell-DYN Ruby (Abbott)                                         & ADVIA2120.1 (Seimens)             & DxH600\_2 (Beckman Coulter)                    \\
+            & Hemoglobin electrophoresis     & Minicap (Sebia)                                                &                                   &                                                
+\end{tblr}
+\end{table}
+```
+
+### **Source of biases and ways to prevent them**
+
+#### **Source of biases**
+
+There were two types of bias that occur.
+Firstly, there was selection bias while selecting which medical record to be included in the study.
+Secondly, information bias appeared in 3 stages: Doctors collected false information from pregnant women and write them in the medical record and poor quality machines gave wrong measurement and screening results, or different machines from different facilities from different producers with different quality and scales of measurement.
+Then, during data extraction from medical records, researchers did not fully understand all the information.
+And finally the third stage, during data input to the database, researchers could incorrectly enter data.
+
+#### **Ways to prevent biases**
+
+Based on these potential biases, we had some solutions.
+We included all medical records that filled inclusion and exclusion criteria into our study, we used standardized machines for measurement in both hospital, standardized data input forms, and double checking during data extraction and data input.
+
+### **Ethical issues**
+
+This research was approved by the Institutional Review Board of Vietnam National Hospital Of Obstetrics and Gynecology, decision number 1776/QĐ-PSTW 29th December 2020.
+All data collected are input into our web-based tool and stored there.
+Accounts to access the tool were provided to researchers who input the data and only accounts of PI and software developers can extract the data.
+
+## **Description of the present study**
+
+The present study used data collected from the parent study to build and test four AI models in prenatal screening for Down Syndrome with the outcome variable is whether the fetus has Down Syndrome by Amniocentesis test.
+
+### **Study diagram**
+
+```{r study diagram, fig.height = 5, fig.width = 10, fig.cap = "Study diagram", echo=FALSE}
+diagram1 <- boxGrob(glue("Medical record of pregnant women who went to National Hospital of Obstetric and Gynecology"))
+diagram2 <- boxGrob(glue("Extract ultrasound test, maternal serum test, history of pregnancy, amniocentesis test result"))
+diagram3 <- boxGrob(glue("Build machine learning models and validate them"))
+diagram4 <- boxGrob(glue("Apply built machine learning models on testing data to calculate risks of Down Syndrome"))
+diagram5 <- boxGrob(glue("Compare calculated risks with amniocentesis test result"))
+diagram6 <- boxGrob(glue("Draw ROC curve and choose the best model, best cut-off point"))
+
+grid.newpage()
+
+vert1 <- spreadVertical(diagram1 = diagram1,
+                        diagram2 = diagram2,
+                        diagram3 = diagram3,
+                        diagram4 = diagram4,
+                        diagram5 = diagram5,
+                        diagram6 = diagram6)
+
+connectGrob(vert1$diagram1, vert1$diagram2, type = "v")
+connectGrob(vert1$diagram2, vert1$diagram3, type = "v")
+connectGrob(vert1$diagram3, vert1$diagram4, type = "v")
+connectGrob(vert1$diagram4, vert1$diagram5, type = "v")
+connectGrob(vert1$diagram5, vert1$diagram6, type = "v")
+
+vert1
+```
+
+### **Extracted information**
+
+```{=tex}
+\begin{longtblr}[
+  caption = {Extracted information},
+]{
+  width = \linewidth,
+  colspec = {Q[471]Q[117]Q[352]},
+  vlines,
+  hline{1-44} = {-}{},
+}
+Variable                                      & Data type  & Value                                       \\
+Socio-economic status                         &            &                                             \\
+Date of birth                                 &            & Date                                        \\
+Pregnancy history                             &            &                                             \\
+History of having fetus with Down syndrome    & Binary     & 1.   Yes; 0. No                             \\
+Maternal serum                                &            &                                             \\
+Free Beta-hCG                                 & Continuous & Unit:   MoM                                 \\
+PAPP-A                                        & Continuous & Unit:   MoM                                 \\
+AFP                                           & Continuous & Unit:   MoM                                 \\
+hCG                                           & Continuous & Unit:   MoM                                 \\
+uE3                                           & Continuous & Unit:   MoM                                 \\
+Ultrasound test                               &            &                                             \\
+Gestational age                               & Discrete   & Unit:   Week                                \\
+Fetal crown-rump length                       & Continuous & Unit:   mm                                  \\
+Nuchal translucency                           & Continuous & Unit:   mm                                  \\
+Biparietal diameter                           & Continuous & Unit:   mm                                  \\
+Cerebellum size                               & Continuous & Unit:   mm                                  \\
+Posterior Cranial Fossa size                  & Continuous & Unit:   mm                                  \\
+Fetal heart rate                              & Continuous & Unit:   Times per min                       \\  
+Lateral ventricles size                       & Continuous & Unit:   mm                                  \\
+Choroid plexus cyst                           & Binary     & 1.   Yes; 0. No                             \\
+Head circumference                            & Continuous & Unit:   mm                                  \\
+Fetal has nose                                & Binary     & 1.   Yes; 0. No                             \\
+Nose length                                   & Continuous & Unit:   mm                                  \\
+Length between eyeballs                       & Continuous & Unit:   mm                                  \\
+Abdominal circumference                       & Continuous & Unit:   mm                                  \\
+Abdominal diameter                            & Continuous & Unit:   mm                                  \\
+Normal kidneys                                & Binary     & 1.   Yes; 0. No                             \\
+Open hand sign                                & Binary     & 1.   Yes; 0. No                             \\
+Femur length                                  & Continuous & Unit:   mm                                  \\
+Normal placenta                               & Binary     & 1.   Yes; 0. No                             \\
+Normal amniotic fluid                         & Binary     & 1.   Yes; 0. No                             \\
+Down Syndrome confirmation                    &            &                                             \\
+Having Down Syndrome by Amniocentesis test    & Binary     & 1.   Yes; 2. No                             
+\end{longtblr}
+```
+
+### **Statistical analysis**
+
+Data was analyzed using Rstudio version 4.2.2, this whole document was written using Rmarkdown.
+All 4 machine learning models were built using caret package version 6.0-94. All 
+Quantitative data was presented as numbers and percentages.
+Continuous variables was summarized using means, standard deviations, medians, inter-quantile ranges.
+The detail process of building machine learning models can be observed in the result section.
+
+#### **Assessing sensitivity, specificity of AI models**
+
+The amniocentesis test is a diagnostic test used to confirm if a fetus has Down Syndrome so this test result is the "golden standard" of our study.
+All AI models' results will be compared with this test result.
+Four AI models were developed using four machine learning algorithms.
+They are K-nearest neighbor (KNN), Support Vector Machine (SVM), Random Forest (RF) and Extreme Gradient Boosting (XGBoost).
+All of these algorithms were well-known for their ability in classification problem.
+Because the result we collected is the risk of having Down Syndrome as percentage produced by all AI models, so sensitivity (detection rate) and specificity (1 -- false positive rate) of each cut-off point were assessed and visualized using Receiver Operating Characteristic (ROC) curve.
+Sensitivity and specificity were calculated as below:
+
+```{=tex}
+\begin{center}
+Sensitivity = $\frac{True\ Positive}{True\ Positive\ +\ False\ Negative}$
+\end{center}
+```
+
+```{=tex}
+\begin{center}
+Specificity = $\frac{True\ Negative}{True\ Negative\ +\ False\ Positive}$
+\end{center}
+```
+where true positives (TP) and true negatives (TN) are correct predictions for patients' Down syndrome status, false positives (FP) and false negatives (FN) are erroneous Down Syndrome predictions.
+The cut-off point to classify if a case had high or low risk of Down Syndrome will be chosen base on sensitivity and specificity at that point.
+An optimal cut-off is the point that has the highest sensitivity and highest specificity.
+Because all these machine learning models were built for screening purpose, sensitivity was prioritized in choosing the best cut-off point.
+
+# **Chapter 3: Result**
+
+```{r import data, include=FALSE}
+data <- read_excel("E:/K2meep/Final Project/Thesis/Data/tsts_08022023.xlsx")
+```
+
+```{r gen mom age, include=FALSE}
+data$tuoime <- as.numeric(format(data$ngaythuchien_thainhi, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$ngaythuchien_thaiphu, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$ngaythuchien_thaiphu, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$ngaythuchien_NST, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$ngaythuchien_NST, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$d_ngaythuchien, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$d_ngaythuchien, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$t_ngaythuchien, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$t_ngaythuchien, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$ngaythuchien_nipt, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$ngaythuchien_nipt, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+#data$tuoime[is.na(data$tuoime)] <- as.numeric(format(data$ngaythuchien_thala_thaiphu, "%Y")) - as.numeric(format(data$ngaysinh, "%Y"))
+data$tuoime <- ifelse(is.na(data$tuoime), as.numeric(format(data$ngaythuchien_thala_thaiphu, "%Y")) - as.numeric(format(data$ngaysinh, "%Y")), data$tuoime)
+data$tuoime[is.na(data$tuoime) | data$tuoime < 16 | data$tuoime > 55] <- NA
+```
+
+```{r gen fetus age, include=FALSE}
+data$tuoithai_ngay[data$tuoithai_ngay > 6] <- NA
+data$tuoithai_ngay[is.na(data$tuoithai_ngay)] <- 0
+data$tuoithai_tuan[data$tuoithai_tuan < 11 | data$tuoithai_tuan > 23] <- NA
+data$tuoithai <- data$tuoithai_tuan * 7 + data$tuoithai_ngay
+
+# change trimester based on fetus age
+data$sieuamkythun[data$tuoithai <= 97 & (data$sieuamkythun %in% c(2, 3, 4))] <- 1
+data$sieuamkythun[data$tuoithai >= 105 & !is.na(data$tuoithai) & (data$sieuamkythun %in% c(1, 3, 4))] <- 2
+```
+
+```{r cleaning data, include=FALSE}
+# Remove ketluan_hoichungdown if it's equal 0
+data$ketluan_hoichungdown[data$ketluan_hoichungdown == 0] <- NA
+
+# Replace chieudaidaumong
+data$chieudaidaumong[data$sieuamkythun == 2] <- NA
+data$chieudaidaumong[(data$chieudaidaumong > 600 | data$chieudaidaumong < 35) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$chieudaidaumong[data$chieudaidaumong < 38 & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+
+# Replace dau_duongkinhluongdinh
+data$dau_duongkinhluongdinh[(data$dau_duongkinhluongdinh > 31 | data$dau_duongkinhluongdinh == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+#data$dau_duongkinhluongdinh[data$dau_duongkinhluongdinh > 29 & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$dau_duongkinhluongdinh[data$dau_duongkinhluongdinh > 31 & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$dau_duongkinhluongdinh[(data$dau_duongkinhluongdinh > 64 | data$dau_duongkinhluongdinh < 17) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+
+# Replace dau_chuvidau
+data$dau_chuvidau[(data$dau_chuvidau > 107 | data$dau_chuvidau < 48) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+#data$dau_chuvidau[(data$dau_chuvidau > 100 | data$dau_chuvidau < 54) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$dau_chuvidau[(data$dau_chuvidau > 107 | data$dau_chuvidau < 48) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$dau_chuvidau[(data$dau_chuvidau > 227 | data$dau_chuvidau < 82) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+#data$dau_chuvidau[(data$dau_chuvidau > 225 | data$dau_chuvidau < 90) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+data$dau_chuvidau[(data$dau_chuvidau > 227 | data$dau_chuvidau < 82) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace dau_naothatben
+data$dau_naothatben[data$sieuamkythun == 1] <- NA
+data$dau_naothatben[(data$dau_naothatben > 7 | data$dau_naothatben < 3) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$dau_naothatben[(data$dau_naothatben > 7 | data$dau_naothatben < 3) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace mat_khoangcach2homat
+data$mat_khoangcach2homat[data$sieuamkythun == 1] <- NA
+#data$mat_khoangcach2homat[(data$mat_khoangcach2homat > 28 | data$mat_khoangcach2homat < 12) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$mat_khoangcach2homat[(data$mat_khoangcach2homat > 28 | data$mat_khoangcach2homat < 10) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$mat_khoangcach2homat[(data$mat_khoangcach2homat > 28 | data$mat_khoangcach2homat < 10) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace mat_xuongsongmui
+data$mat_xuongsongmui[data$sieuamkythun == 1] <- NA
+data$mat_xuongsongmui[(data$mat_xuongsongmui > 9 | data$mat_xuongsongmui < 1.2) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+#data$mat_xuongsongmui[(data$mat_xuongsongmui > 9 | data$mat_xuongsongmui < 1.4) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+data$mat_xuongsongmui[(data$mat_xuongsongmui > 9 | data$mat_xuongsongmui < 1.2) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace nguc_nhiptimthai
+data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 196 | data$nguc_nhiptimthai < 128) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+#data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 196 | data$nguc_nhiptimthai < 137) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 196 | data$nguc_nhiptimthai < 128) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 177 | data$nguc_nhiptimthai < 130) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+#data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 170 | data$nguc_nhiptimthai < 135) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+data$nguc_nhiptimthai[(data$nguc_nhiptimthai > 177 | data$nguc_nhiptimthai < 130) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace chi_chieudaixuongdui
+data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 14 | data$chi_chieudaixuongdui < 3) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 14 | data$chi_chieudaixuongdui < 3) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 46 | data$chi_chieudaixuongdui < 7) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+#data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 40 | data$chi_chieudaixuongdui < 7) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+data$chi_chieudaixuongdui[(data$chi_chieudaixuongdui > 46 | data$chi_chieudaixuongdui < 7) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace d_mom_pappa
+data$d_mom_pappa[data$sieuamkythun == 2] <- NA
+data$d_mom_pappa[(data$d_mom_pappa > 1.75 | data$d_mom_pappa < 0.03) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$d_mom_pappa[(data$d_mom_pappa > 1.75 | data$d_mom_pappa < 0.03) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+
+# Replace d_mom_hcgb
+data$d_mom_hcgb[data$sieuamkythun == 2] <- NA
+data$d_mom_hcgb[(data$d_mom_hcgb > 3.8 | data$d_mom_hcgb == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$d_mom_hcgb[(data$d_mom_hcgb > 3.8 | data$d_mom_hcgb == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+
+# Replace t_mom_ue3
+data$t_mom_ue3[data$sieuamkythun == 1] <- NA
+data$t_mom_ue3[(data$t_mom_ue3 > 1.92 | data$t_mom_ue3 == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$t_mom_ue3[(data$t_mom_ue3 > 1.92 | data$t_mom_ue3 == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace t_mom_afp
+data$t_mom_afp[data$sieuamkythun == 1] <- NA
+data$t_mom_afp[(data$t_mom_afp > 1.53 | data$t_mom_afp == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$t_mom_afp[(data$t_mom_afp > 1.53 | data$t_mom_afp == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace t_mom_hcg
+data$t_mom_hcg[data$sieuamkythun == 1] <- NA
+data$t_mom_hcg[(data$t_mom_hcg > 4.5 | data$t_mom_hcg == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 2] <- NA
+data$t_mom_hcg[(data$t_mom_hcg > 4.5 | data$t_mom_hcg == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 2] <- NA
+
+# Replace d_khoangsangsaugay
+data$d_khoangsangsaugay[data$sieuamkythun == 2] <- NA
+data$d_khoangsangsaugay[(data$d_khoangsangsaugay > 4 | data$d_khoangsangsaugay == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$d_khoangsangsaugay[(data$d_khoangsangsaugay > 4 | data$d_khoangsangsaugay == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+data$d_khoangsangsaugay[is.na(data$d_khoangsangsaugay)] <- data$co_khoangsangsaugay[is.na(data$d_khoangsangsaugay)]
+data$d_khoangsangsaugay[data$sieuamkythun == 2] <- NA
+data$d_khoangsangsaugay[(data$d_khoangsangsaugay > 5.9 | data$d_khoangsangsaugay == 0) & data$dulieu_kiemdinh == 0 & data$sieuamkythun == 1] <- NA
+data$d_khoangsangsaugay[(data$d_khoangsangsaugay > 5.9 | data$d_khoangsangsaugay == 0) & data$dulieu_kiemdinh == 1 & data$sieuamkythun == 1] <- NA
+```
+
+```{r recode variable, include=FALSE}
+# Recode ketluan_hoichungdown
+data$ketluan_hoichungdown[data$ketluan_hoichungdown == 1] <- 0
+data$ketluan_hoichungdown[data$ketluan_hoichungdown == 2] <- 1
+data$ketluan_hoichungdown <- as.factor(data$ketluan_hoichungdown)
+data$ketluan_hoichungdown <- ifelse(data$ketluan_hoichungdown == 0, "No", "Yes")
+
+# Consider dulieu_kiemdinh as factor variable
+data$dulieu_kiemdinh <- as.factor(data$dulieu_kiemdinh)
+
+# Recode tiensusinhconhoichungdown
+data$tiensusinhconhoichungdown[data$tiensusinhconhoichungdown == 2] <- 0
+data$tiensusinhconhoichungdown <- as.factor(data$tiensusinhconhoichungdown)
+
+# Recode mat_moimui
+data$mat_moimui[data$mat_moimui == 1] <- 0
+data$mat_moimui[data$mat_moimui == 2] <- 1
+data$mat_moimui <- as.factor(data$mat_moimui)
+
+# Recode nguc_ditattim
+data$nguc_ditattim[data$nguc_ditattim == 2] <- 0
+data$nguc_ditattim <- as.factor(data$nguc_ditattim)
+```
+
+```{r define normalize function, include=FALSE}
+normalize <- function(x) {
+    norm <- ((x - min(x))/(max(x) - min(x)))
+    return (norm)
+}
+```
+
+```{r define model report function, include=FALSE}
+MySummary  <- function(data, lev = NULL, model = NULL){
+  a1 <- defaultSummary(data, lev, model)
+  b1 <- twoClassSummary(data, lev, model)
+  c1 <- prSummary(data, lev, model)
+  out <- c(a1, b1, c1)
+  out}
+```
+
+```{r sa_tk1, include=FALSE}
+# Get ultrasound semeter 1 ultrasound data
+sa_tk1 <- data %>%
+  filter(sieuamkythun == 1,
+         !is.na(tuoime),
+         !is.na(tuoithai),
+         !is.na(tiensusinhconhoichungdown),
+         !is.na(chieudaidaumong),
+         !is.na(dau_duongkinhluongdinh),
+         !is.na(dau_chuvidau),
+         !is.na(mat_moimui),
+         !is.na(nguc_nhiptimthai),
+         !is.na(d_khoangsangsaugay),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(dulieu_kiemdinh,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 1 ultrasound data, include=FALSE}
+# Get the data set without dependent variable ketluan_hoichungdown
+sa_tk1_impute_model_data <- sa_tk1[, !(colnames(sa_tk1) == "ketluan_hoichungdown")]
+
+ignore <- sa_tk1_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the data set
+sa_tk1_imputed <- mice(sa_tk1_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sa_tk1_impute_model_data)
+
+# Impute missing values in testing set
+sa_tk1_imputed <- complete(sa_tk1_imputed)
+
+sa_tk1_imputed <- cbind(sa_tk1_imputed, sa_tk1[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sa_tk1, include=FALSE}
+# Get ultrasound semeter 1 training data
+train_sa_tk1 <- sa_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r test_sa_tk1, include=FALSE}
+# Get ultrasound semeter 1 testing data
+test_sa_tk1 <- sa_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r smote_train_sa_tk1, include=FALSE}
+# Perform SMOTENC oversampling method
+set.seed(123)
+train_sa_tk1$ketluan_hoichungdown = as.factor(train_sa_tk1$ketluan_hoichungdown)
+smote_train_sa_tk1 <- smotenc(train_sa_tk1, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+
+# smote_train_sa_tk1 <- SMOTE(ketluan_hoichungdown ~ ., data = data.frame(train_sa_tk1), perc.over = 400)
+# 
+# # Remove rows with ketluan_hoichungdown == 1 from train_sa_tk1_train
+# train_sa_tk1 <- train_sa_tk1[train_sa_tk1$ketluan_hoichungdown != "Yes", ]
+# 
+# # Append rows with ketluan_hoichungdown == 1 from smote_sa_tk1_train
+# train_sa_tk1 <- rbind(train_sa_tk1, smote_train_sa_tk1[smote_train_sa_tk1$ketluan_hoichungdown == "Yes", ])
+# 
+# rm(smote_train_sa_tk1)
+```
+
+```{r train_sa_tk1 normalization, include=FALSE}
+# Normalize training data
+train_sa_tk1_n <- as.data.frame(lapply(smote_train_sa_tk1[,c("tuoime",
+                                                             "tuoithai",
+                                                             "chieudaidaumong",
+                                                             "dau_duongkinhluongdinh",
+                                                             "dau_chuvidau",
+                                                             "nguc_nhiptimthai",
+                                                             "d_khoangsangsaugay")], normalize))
+
+train_sa_tk1_n <- cbind(train_sa_tk1_n, smote_train_sa_tk1[, c("tiensusinhconhoichungdown",
+                                                               "mat_moimui",
+                                                               "ketluan_hoichungdown")])
+#train_sa_tk1_n <- cbind(train_sa_tk1_n, ketluan_hoichungdown = smote_train_sa_tk1$ketluan_hoichungdown)
+
+# Normalize testing data
+test_sa_tk1_n <- as.data.frame(lapply(test_sa_tk1[,c("tuoime",
+                                                     "tuoithai",
+                                                     "chieudaidaumong",
+                                                     "dau_duongkinhluongdinh",
+                                                     "dau_chuvidau",
+                                                     "nguc_nhiptimthai",
+                                                     "d_khoangsangsaugay")], normalize))
+
+test_sa_tk1_n <- cbind(test_sa_tk1_n, test_sa_tk1[, c("tiensusinhconhoichungdown",
+                                                      "mat_moimui",
+                                                      "ketluan_hoichungdown")])
+#test_sa_tk1_n <- cbind(test_sa_tk1_n, ketluan_hoichungdown = test_sa_tk1$ketluan_hoichungdown)
+```
+
+```{r sa_tk1 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sa_tk1 <- train(ketluan_hoichungdown~., data=train_sa_tk1_n, method="knn", trControl=trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_knn_sa_tk1 <- predict(knn_sa_tk1, newdata = test_sa_tk1_n, type = "prob")
+
+# Draw the ROC
+cf_knn_sa_tk1 <- plot.roc(test_sa_tk1_n$ketluan_hoichungdown, prediction_knn_sa_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_knn_sa_tk1 <- pROC::roc(test_sa_tk1_n$ketluan_hoichungdown, prediction_knn_sa_tk1[,1])
+coords_knn_sa_tk1 <- coords(rp_knn_sa_tk1, "best", ret = c("threshold", "auc", "sens", "spec", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sa_tk1 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sa_tk1 <- train(ketluan_hoichungdown~., data = train_sa_tk1_n, method = "svmLinear", trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_svm_sa_tk1 <- predict(svm_sa_tk1, newdata = test_sa_tk1_n, type = "prob")
+
+# Draw the ROC
+cf_svm_sa_tk1 <- plot.roc(test_sa_tk1_n$ketluan_hoichungdown, prediction_svm_sa_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_svm_sa_tk1 <- pROC::roc(test_sa_tk1_n$ketluan_hoichungdown, prediction_svm_sa_tk1[,1])
+coords_svm_sa_tk1 <- coords(rp_svm_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sa_tk1 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sa_tk1 <- train(ketluan_hoichungdown~., data = train_sa_tk1_n, method = "rf", ntree = 2000, max_depth = 3, trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_rf_sa_tk1 <- predict(rf_sa_tk1, newdata = test_sa_tk1_n, type = "prob")
+
+# Draw the ROC
+cf_rf_sa_tk1 <- plot.roc(test_sa_tk1_n$ketluan_hoichungdown, prediction_rf_sa_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_rf_sa_tk1 <- pROC::roc(test_sa_tk1_n$ketluan_hoichungdown, prediction_rf_sa_tk1[,1])
+coords_rf_sa_tk1 <- coords(rp_rf_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sa_tk1 xgb model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sa_tk1 <- train(ketluan_hoichungdown~., data = train_sa_tk1_n, method = "xgbTree", trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"), verbosity = 0)
+
+# Test the model on test set
+set.seed(123)
+prediction_xgb_sa_tk1 <- predict(xgb_sa_tk1, newdata = test_sa_tk1_n, type = "prob")
+
+# Draw the ROC
+cf_xgb_sa_tk1 <- plot.roc(test_sa_tk1_n$ketluan_hoichungdown, prediction_xgb_sa_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_xgb_sa_tk1 <- pROC::roc(test_sa_tk1_n$ketluan_hoichungdown, prediction_xgb_sa_tk1[,1])
+coords_xgb_sa_tk1 <- coords(rp_xgb_sa_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sh_tk1, include=FALSE}
+# Get ultrasound semeter 1 ultrasound data
+sh_tk1 <- data %>%
+  filter(sieuamkythun == 1,
+         !is.na(d_mom_pappa),
+         !is.na(d_mom_hcgb),
+         !is.na(d_khoangsangsaugay),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(dulieu_kiemdinh,
+         d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 1 biochemical data, include=FALSE}
+# Get the data set without dependent variable ketluan_hoichungdown
+sh_tk1_impute_model_data <- sh_tk1[, !(colnames(sh_tk1) == "ketluan_hoichungdown")]
+
+ignore <- sh_tk1_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the data set
+sh_tk1_imputed <- mice(sh_tk1_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sh_tk1_impute_model_data)
+
+# Impute missing values in testing set
+sh_tk1_imputed <- complete(sh_tk1_imputed)
+
+sh_tk1_imputed <- cbind(sh_tk1_imputed, sh_tk1[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sh_tk1, include=FALSE}
+# Get ultrasound semeter 1 training data
+train_sh_tk1 <- sh_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r test_sh_tk1, include=FALSE}
+# Get ultrasound semeter 1 testing data
+test_sh_tk1 <- sh_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r smote_train_sh_tk1, include=FALSE}
+# Perform SMOTENC overshmpling method
+set.seed(123)
+train_sh_tk1$ketluan_hoichungdown = as.factor(train_sh_tk1$ketluan_hoichungdown)
+smote_train_sh_tk1 <- smotenc(train_sh_tk1, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+
+# smote_train_sh_tk1 <- SMOTE(ketluan_hoichungdown ~ ., data = data.frame(train_sh_tk1), perc.over = 400)
+# 
+# # Remove rows with ketluan_hoichungdown == 1 from train_sh_tk1_train
+# train_sh_tk1 <- train_sh_tk1[train_sh_tk1$ketluan_hoichungdown != "Yes", ]
+# 
+# # Append rows with ketluan_hoichungdown == 1 from smote_sh_tk1_train
+# train_sh_tk1 <- rbind(train_sh_tk1, smote_train_sh_tk1[smote_train_sh_tk1$ketluan_hoichungdown == "Yes", ])
+# 
+# rm(smote_train_sh_tk1)
+```
+
+```{r train_sh_tk1 normalization, include=FALSE}
+# Normalize training data
+train_sh_tk1_n <- as.data.frame(lapply(smote_train_sh_tk1[,c("d_mom_pappa",
+                                                             "d_mom_hcgb",
+                                                             "d_khoangsangsaugay")], normalize))
+
+train_sh_tk1_n <- cbind(train_sh_tk1_n, ketluan_hoichungdown = smote_train_sh_tk1$ketluan_hoichungdown)
+
+# Normalize testing data
+test_sh_tk1_n <- as.data.frame(lapply(test_sh_tk1[,c("d_mom_pappa",
+                                                     "d_mom_hcgb",
+                                                     "d_khoangsangsaugay")], normalize))
+
+test_sh_tk1_n <- cbind(test_sh_tk1_n, ketluan_hoichungdown = test_sh_tk1$ketluan_hoichungdown)
+```
+
+```{r sh_tk1 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sh_tk1 <- train(ketluan_hoichungdown~., data=train_sh_tk1_n, method="knn", trControl=trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_knn_sh_tk1 <- predict(knn_sh_tk1, newdata = test_sh_tk1_n, type = "prob")
+
+# Draw the ROC
+cf_knn_sh_tk1 <- plot.roc(test_sh_tk1_n$ketluan_hoichungdown, prediction_knn_sh_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_knn_sh_tk1 <- pROC::roc(test_sh_tk1_n$ketluan_hoichungdown, prediction_knn_sh_tk1[,1])
+coords_knn_sh_tk1 <- coords(rp_knn_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sh_tk1 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sh_tk1 <- train(ketluan_hoichungdown~., data = train_sh_tk1_n, method = "svmLinear", trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_svm_sh_tk1 <- predict(svm_sh_tk1, newdata = test_sh_tk1_n, type = "prob")
+
+# Draw the ROC
+cf_svm_sh_tk1 <- plot.roc(test_sh_tk1_n$ketluan_hoichungdown, prediction_svm_sh_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_svm_sh_tk1 <- pROC::roc(test_sh_tk1_n$ketluan_hoichungdown, prediction_svm_sh_tk1[,1])
+coords_svm_sh_tk1 <- coords(rp_svm_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sh_tk1 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sh_tk1 <- train(ketluan_hoichungdown~., data = train_sh_tk1_n, method = "rf", ntree = 2000, max_depth = 3, trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_rf_sh_tk1 <- predict(rf_sh_tk1, newdata = test_sh_tk1_n, type = "prob")
+
+# Draw the ROC
+cf_rf_sh_tk1 <- plot.roc(test_sh_tk1_n$ketluan_hoichungdown, prediction_rf_sh_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_rf_sh_tk1 <- pROC::roc(test_sh_tk1_n$ketluan_hoichungdown, prediction_rf_sh_tk1[,1])
+coords_rf_sh_tk1 <- coords(rp_rf_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sh_tk1 xgb model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sh_tk1 <- train(ketluan_hoichungdown~., data = train_sh_tk1_n, method = "xgbTree", trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"), verbosity = 0)
+
+# Test the model on test set
+set.seed(123)
+prediction_xgb_sh_tk1 <- predict(xgb_sh_tk1, newdata = test_sh_tk1_n, type = "prob")
+
+# Draw the ROC5rtttttttttttr
+cf_xgb_sh_tk1 <- plot.roc(test_sh_tk1_n$ketluan_hoichungdown, prediction_xgb_sh_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_xgb_sh_tk1 <- pROC::roc(test_sh_tk1_n$ketluan_hoichungdown, prediction_xgb_sh_tk1[,1])
+coords_xgb_sh_tk1 <- coords(rp_xgb_sh_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sash_tk1, include=FALSE}
+# Get trimester 1 ultrasound and biochemical data
+sash_tk1 <- data %>%
+  filter(sieuamkythun == 1,
+         !is.na(tuoime),
+         !is.na(tuoithai),
+         !is.na(tiensusinhconhoichungdown),
+         !is.na(chieudaidaumong),
+         !is.na(dau_duongkinhluongdinh),
+         !is.na(dau_chuvidau),
+         !is.na(mat_moimui),
+         !is.na(nguc_nhiptimthai),
+         !is.na(d_mom_pappa),
+         !is.na(d_mom_hcgb),
+         !is.na(d_khoangsangsaugay),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(sieuamkythun,
+         dulieu_kiemdinh,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 1 ultrasound and biochemical data, include=FALSE}
+# Get the data set without dependent variable ketluan_hoichungdown
+sash_tk1_impute_model_data <- sash_tk1[, !(colnames(sash_tk1) == "ketluan_hoichungdown")]
+
+ignore <- sash_tk1_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the data set
+sash_tk1_imputed <- mice(sash_tk1_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sash_tk1_impute_model_data)
+
+# Impute missing values in testing set
+sash_tk1_imputed <- complete(sash_tk1_imputed)
+
+sash_tk1_imputed <- cbind(sash_tk1_imputed, sash_tk1[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sash_tk1, include=FALSE}
+# Get ultrasound and biochemical semeter 1 training data
+train_sash_tk1 <- sash_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r test_sash_tk1, include=FALSE}
+# Get ultrasound and biochemical semeter 1 testing data
+test_sash_tk1 <- sash_tk1_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         chieudaidaumong,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         mat_moimui,
+         nguc_nhiptimthai,
+         d_mom_pappa,
+         d_mom_hcgb,
+         d_khoangsangsaugay,
+         ketluan_hoichungdown)
+```
+
+```{r smote_sash_tk1, include=FALSE}
+# Perform SMOTE oversampling method
+set.seed(123)
+train_sash_tk1$ketluan_hoichungdown = as.factor(train_sash_tk1$ketluan_hoichungdown)
+smote_train_sash_tk1 <- smotenc(train_sash_tk1, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+
+# smote_train_sash_tk1 <- SMOTE(ketluan_hoichungdown ~ ., data = data.frame(train_sash_tk1), perc.over = 1000)
+# 
+# # Remove rows with ketluan_hoichungdown == 1 from train_sash_tk1
+# train_sash_tk1 <- train_sash_tk1[train_sash_tk1$ketluan_hoichungdown != "Yes", ]
+# 
+# # Append rows with ketluan_hoichungdown == 1 from smote_sash_tk1
+# train_sash_tk1 <- rbind(train_sash_tk1, smote_train_sash_tk1[smote_train_sash_tk1$ketluan_hoichungdown == "Yes", ])
+# 
+# rm(smote_train_sash_tk1)
+```
+
+```{r sash_tk1 normalization, include=FALSE}
+# Normalize training data
+train_sash_tk1_n <- as.data.frame(lapply(smote_train_sash_tk1[,c("tuoime",
+                                                                 "tuoithai",
+                                                                 "chieudaidaumong",
+                                                                 "dau_duongkinhluongdinh",
+                                                                 "dau_chuvidau",
+                                                                 "nguc_nhiptimthai",
+                                                                 "d_mom_pappa",
+                                                                 "d_mom_hcgb",
+                                                                 "d_khoangsangsaugay")], normalize))
+
+train_sash_tk1_n <- cbind(train_sash_tk1_n, smote_train_sash_tk1[, c("tiensusinhconhoichungdown",
+                                                                     "mat_moimui",
+                                                                     "ketluan_hoichungdown")])
+#train_sash_tk1_n <- cbind(train_sash_tk1_n, ketluan_hoichungdown = smote_train_sash_tk1$ketluan_hoichungdown)
+
+# Normalize testing data
+test_sash_tk1_n <- as.data.frame(lapply(test_sash_tk1[,c("tuoime",
+                                                         "tuoithai",
+                                                         "chieudaidaumong",
+                                                         "dau_duongkinhluongdinh",
+                                                         "dau_chuvidau",
+                                                         "nguc_nhiptimthai",
+                                                         "d_mom_pappa",
+                                                         "d_mom_hcgb",
+                                                         "d_khoangsangsaugay")], normalize))
+
+test_sash_tk1_n <- cbind(test_sash_tk1_n, test_sash_tk1[, c("tiensusinhconhoichungdown",
+                                                            "mat_moimui",
+                                                            "ketluan_hoichungdown")])
+#test_sash_tk1_n <- cbind(test_sash_tk1_n, ketluan_hoichungdown = test_sash_tk1$ketluan_hoichungdown)
+```
+
+```{r sash_tk1 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sash_tk1 <- train(ketluan_hoichungdown~., data=train_sash_tk1_n, method="knn", trControl=trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_knn_sash_tk1 <- predict(knn_sash_tk1, newdata = test_sash_tk1_n, type = "prob")
+
+# Draw the ROC
+cf_knn_sash_tk1 <- plot.roc(test_sash_tk1_n$ketluan_hoichungdown, prediction_knn_sash_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_knn_sash_tk1 <- pROC::roc(test_sash_tk1_n$ketluan_hoichungdown, prediction_knn_sash_tk1[,1])
+coords_knn_sash_tk1 <- coords(rp_knn_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sash_tk1 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sash_tk1 <- train(ketluan_hoichungdown~., data = train_sash_tk1_n, method = "svmLinear", trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_svm_sash_tk1 <- predict(svm_sash_tk1, newdata = test_sash_tk1_n, type = "prob")
+
+# Draw the ROC
+cf_svm_sash_tk1 <- plot.roc(test_sash_tk1_n$ketluan_hoichungdown, prediction_svm_sash_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_svm_sash_tk1 <- pROC::roc(test_sash_tk1_n$ketluan_hoichungdown, prediction_svm_sash_tk1[,1])
+coords_svm_sash_tk1 <- coords(rp_svm_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sash_tk1 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sash_tk1 <- train(ketluan_hoichungdown~., data = train_sash_tk1_n, method = "rf", ntree = 2000, max_depth = 3, trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_rf_sash_tk1 <- predict(rf_sash_tk1, newdata = test_sash_tk1_n, type = "prob")
+
+# Draw the ROC
+cf_rf_sash_tk1 <- plot.roc(test_sash_tk1_n$ketluan_hoichungdown, prediction_rf_sash_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_rf_sash_tk1 <- pROC::roc(test_sash_tk1_n$ketluan_hoichungdown, prediction_rf_sash_tk1[,1])
+coords_rf_sash_tk1 <- coords(rp_rf_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sash_tk1 xgb model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sash_tk1 <- train(ketluan_hoichungdown~., data = train_sash_tk1_n, method = "xgbTree", trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"), verbosity = 0)
+
+# Test the model on test set
+set.seed(123)
+prediction_xgb_sash_tk1 <- predict(xgb_sash_tk1, newdata = test_sash_tk1_n, type = "prob")
+
+# Draw the ROC
+cf_xgb_sash_tk1 <- plot.roc(test_sash_tk1_n$ketluan_hoichungdown, prediction_xgb_sash_tk1[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_xgb_sash_tk1 <- pROC::roc(test_sash_tk1_n$ketluan_hoichungdown, prediction_xgb_sash_tk1[,1])
+coords_xgb_sash_tk1 <- coords(rp_xgb_sash_tk1, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sa_tk2, include=FALSE}
+# Get ultrasound semeter 2 ultrasound data
+sa_tk2 <- data %>%
+  filter(sieuamkythun == 2,
+         !is.na(tuoime),
+         !is.na(tuoithai),
+         !is.na(tiensusinhconhoichungdown),
+         !is.na(dau_duongkinhluongdinh),
+         !is.na(dau_chuvidau),
+         # !is.na(dau_naothatben),
+         # !is.na(mat_khoangcach2homat),
+         # !is.na(mat_xuongsongmui),
+         !is.na(mat_moimui),
+         !is.na(nguc_nhiptimthai),
+         !is.na(nguc_ditattim),
+         !is.na(chi_chieudaixuongdui),
+         !is.na(nguc_ditattim),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(sieuamkythun,
+         dulieu_kiemdinh,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         mat_moimui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 2 ultrasound data, message=FALSE, warning=FALSE, include=FALSE}
+# Get the data set without dependent variable ketluan_hoichungdown
+sa_tk2_impute_model_data <- sa_tk2[, !(colnames(sa_tk2) == "ketluan_hoichungdown")]
+
+ignore <- sa_tk2_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the data set
+sa_tk2_imputed <- mice(sa_tk2_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sa_tk2_impute_model_data)
+
+# Impute missing values in testing set
+sa_tk2_imputed <- complete(sa_tk2_imputed)
+
+sa_tk2_imputed <- cbind(sa_tk2_imputed, sa_tk2[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sa_tk2, include=FALSE}
+# Get ultrasound trimester 2 training data
+train_sa_tk2 <- sa_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         mat_moimui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r test_sa_tk2, include=FALSE}
+# Get ultrasound trimester 2 testing data
+test_sa_tk2 <- sa_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,         
+         mat_moimui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r smote_train_sa_tk2, include=FALSE}
+# Perform SMOTE oversampling method
+set.seed(123)
+train_sa_tk2$ketluan_hoichungdown = as.factor(train_sa_tk2$ketluan_hoichungdown)
+smote_train_sa_tk2 <- smotenc(train_sa_tk2, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+
+# smote_train_sa_tk2 <- SMOTE(ketluan_hoichungdown ~ ., data = data.frame(train_sa_tk2), perc.over = 500)
+# 
+# # Remove rows with ketluan_hoichungdown == 1 from sa_tk2
+# train_sa_tk2 <- train_sa_tk2[train_sa_tk2$ketluan_hoichungdown != "Yes", ]
+# 
+# # Append rows with ketluan_hoichungdown == 1 from smote_sa_tk2
+# train_sa_tk2 <- rbind(train_sa_tk2, smote_train_sa_tk2[smote_train_sa_tk2$ketluan_hoichungdown == "Yes", ])
+# 
+# rm(smote_train_sa_tk2)
+```
+
+```{r sa_tk2 normalization, include=FALSE}
+# Normalize training data
+train_sa_tk2_n <- as.data.frame(lapply(smote_train_sa_tk2[,c("tuoime",
+                                                             "tuoithai",
+                                                             "dau_duongkinhluongdinh",
+                                                             "dau_chuvidau",
+                                                             #"dau_naothatben",
+                                                             #"mat_khoangcach2homat",
+                                                             #"mat_xuongsongmui",
+                                                             "nguc_nhiptimthai",
+                                                             "chi_chieudaixuongdui")], normalize))
+
+train_sa_tk2_n <- cbind(train_sa_tk2_n, smote_train_sa_tk2[, c("tiensusinhconhoichungdown",
+                                                               "mat_moimui",
+                                                               "nguc_ditattim",
+                                                               "ketluan_hoichungdown")])
+
+# Normalize testing data
+test_sa_tk2_n <- as.data.frame(lapply(test_sa_tk2[,c("tuoime",
+                                                     "tuoithai",
+                                                     "dau_duongkinhluongdinh",
+                                                     "dau_chuvidau",
+                                                     #"dau_naothatben",
+                                                     #"mat_khoangcach2homat",
+                                                     #"mat_xuongsongmui",
+                                                     "nguc_nhiptimthai",
+                                                     "chi_chieudaixuongdui")], normalize))
+
+test_sa_tk2_n <- cbind(test_sa_tk2_n, test_sa_tk2[, c("tiensusinhconhoichungdown",
+                                                      "mat_moimui",
+                                                      "nguc_ditattim",
+                                                      "ketluan_hoichungdown")])
+```
+
+```{r sa_tk2 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sa_tk2 <- train(ketluan_hoichungdown~., data=train_sa_tk2_n, method="knn", trControl=trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_knn_sa_tk2 <- predict(knn_sa_tk2, newdata = test_sa_tk2_n, type = "prob")
+
+# Draw the ROC
+cf_knn_sa_tk2 <- plot.roc(test_sa_tk2_n$ketluan_hoichungdown, prediction_knn_sa_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_knn_sa_tk2 <- pROC::roc(test_sa_tk2_n$ketluan_hoichungdown, prediction_knn_sa_tk2[,1])
+coords_knn_sa_tk2 <- coords(rp_knn_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sa_tk2 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sa_tk2 <- train(ketluan_hoichungdown~., data = train_sa_tk2_n, method = "svmLinear", trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_svm_sa_tk2 <- predict(svm_sa_tk2, newdata = test_sa_tk2_n, type = "prob")
+
+# Draw the ROC
+cf_svm_sa_tk2 <- plot.roc(test_sa_tk2_n$ketluan_hoichungdown, prediction_svm_sa_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_svm_sa_tk2 <- pROC::roc(test_sa_tk2_n$ketluan_hoichungdown, prediction_svm_sa_tk2[,1])
+coords_svm_sa_tk2 <- coords(rp_svm_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sa_tk2 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sa_tk2 <- train(ketluan_hoichungdown~., data = train_sa_tk2_n, method = "rf", ntree = 2000, max_depth = 3, trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_rf_sa_tk2 <- predict(rf_sa_tk2, newdata = test_sa_tk2_n, type = "prob")
+
+# Draw the ROC
+cf_rf_sa_tk2 <- plot.roc(test_sa_tk2_n$ketluan_hoichungdown, prediction_rf_sa_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_rf_sa_tk2 <- pROC::roc(test_sa_tk2_n$ketluan_hoichungdown, prediction_rf_sa_tk2[,1])
+coords_rf_sa_tk2 <- coords(rp_rf_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sa_tk2 xgb model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sa_tk2 <- train(ketluan_hoichungdown~., data = train_sa_tk2_n, method = "xgbTree", trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"), verbosity = 0)
+
+# Test the model on test set
+set.seed(123)
+prediction_xgb_sa_tk2 <- predict(xgb_sa_tk2, newdata = test_sa_tk2_n, type = "prob")
+
+# Draw the ROC
+cf_xgb_sa_tk2 <- plot.roc(test_sa_tk2_n$ketluan_hoichungdown, prediction_xgb_sa_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_xgb_sa_tk2 <- pROC::roc(test_sa_tk2_n$ketluan_hoichungdown, prediction_xgb_sa_tk2[,1])
+coords_xgb_sa_tk2 <- coords(rp_xgb_sa_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sh_tk2, include=FALSE}
+# Get ultrasound trimester 1 ultrasound data
+sh_tk2 <- data %>%
+  filter(sieuamkythun == 2,
+         !is.na(t_mom_afp),
+         !is.na(t_mom_hcg),
+         !is.na(t_mom_ue3),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(dulieu_kiemdinh,
+         t_mom_afp,
+         t_mom_hcg,
+         t_mom_ue3,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 2 biochemical data, include=FALSE}
+# Get the data set without dependent variable ketluan_hoichungdown
+sh_tk2_impute_model_data <- sh_tk2[, !(colnames(sh_tk2) == "ketluan_hoichungdown")]
+
+ignore <- sh_tk2_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the data set
+sh_tk2_imputed <- mice(sh_tk2_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sh_tk2_impute_model_data)
+
+# Impute missing values in testing set
+sh_tk2_imputed <- complete(sh_tk2_imputed)
+
+sh_tk2_imputed <- cbind(sh_tk2_imputed, sh_tk2[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sh_tk2, include=FALSE}
+# Get ultrasound semeter 1 training data
+train_sh_tk2 <- sh_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(t_mom_afp,
+         t_mom_hcg,
+         t_mom_ue3,
+         ketluan_hoichungdown)
+```
+
+```{r test_sh_tk2, include=FALSE}
+# Get ultrasound semeter 1 testing data
+test_sh_tk2 <- sh_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 1) %>%
+  select(t_mom_afp,
+         t_mom_hcg,
+         t_mom_ue3,
+         ketluan_hoichungdown)
+```
+
+```{r smote_train_sh_tk2, include=FALSE}
+# Perform SMOTENC overshmpling method
+set.seed(123)
+train_sh_tk2$ketluan_hoichungdown = as.factor(train_sh_tk2$ketluan_hoichungdown)
+smote_train_sh_tk2 <- smotenc(train_sh_tk2, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+
+# smote_train_sh_tk2 <- SMOTE(ketluan_hoichungdown ~ ., data = data.frame(train_sh_tk2), perc.over = 400)
+# 
+# # Remove rows with ketluan_hoichungdown == 1 from train_sh_tk2_train
+# train_sh_tk2 <- train_sh_tk2[train_sh_tk2$ketluan_hoichungdown != "Yes", ]
+# 
+# # Append rows with ketluan_hoichungdown == 1 from smote_sh_tk2_train
+# train_sh_tk2 <- rbind(train_sh_tk2, smote_train_sh_tk2[smote_train_sh_tk2$ketluan_hoichungdown == "Yes", ])
+# 
+# rm(smote_train_sh_tk2)
+```
+
+```{r train_sh_tk2 normalization, include=FALSE}
+# Normalize training data
+train_sh_tk2_n <- as.data.frame(lapply(smote_train_sh_tk2[,c("t_mom_afp",
+                                                             "t_mom_hcg",
+                                                             "t_mom_ue3")], normalize))
+
+train_sh_tk2_n <- cbind(train_sh_tk2_n, ketluan_hoichungdown = smote_train_sh_tk2$ketluan_hoichungdown)
+
+# Normalize testing data
+test_sh_tk2_n <- as.data.frame(lapply(test_sh_tk2[,c("t_mom_afp",
+                                                     "t_mom_hcg",
+                                                     "t_mom_ue3")], normalize))
+
+test_sh_tk2_n <- cbind(test_sh_tk2_n, ketluan_hoichungdown = test_sh_tk2$ketluan_hoichungdown)
+```
+
+```{r sh_tk2 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sh_tk2 <- train(ketluan_hoichungdown~., data=train_sh_tk2_n, method="knn", trControl=trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_knn_sh_tk2 <- predict(knn_sh_tk2, newdata = test_sh_tk2_n, type = "prob")
+
+# Draw the ROC
+cf_knn_sh_tk2 <- plot.roc(test_sh_tk2_n$ketluan_hoichungdown, prediction_knn_sh_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_knn_sh_tk2 <- pROC::roc(test_sh_tk2_n$ketluan_hoichungdown, prediction_knn_sh_tk2[,1])
+coords_knn_sh_tk2 <- coords(rp_knn_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sh_tk2 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sh_tk2 <- train(ketluan_hoichungdown~., data = train_sh_tk2_n, method = "svmLinear", trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_svm_sh_tk2 <- predict(svm_sh_tk2, newdata = test_sh_tk2_n, type = "prob")
+
+# Draw the ROC
+cf_svm_sh_tk2 <- plot.roc(test_sh_tk2_n$ketluan_hoichungdown, prediction_svm_sh_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_svm_sh_tk2 <- pROC::roc(test_sh_tk2_n$ketluan_hoichungdown, prediction_svm_sh_tk2[,1])
+coords_svm_sh_tk2 <- coords(rp_svm_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sh_tk2 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sh_tk2 <- train(ketluan_hoichungdown~., data = train_sh_tk2_n, method = "rf", ntree = 2000, max_depth = 3, trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_rf_sh_tk2 <- predict(rf_sh_tk2, newdata = test_sh_tk2_n, type = "prob")
+
+# Draw the ROC
+cf_rf_sh_tk2 <- plot.roc(test_sh_tk2_n$ketluan_hoichungdown, prediction_rf_sh_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_rf_sh_tk2 <- pROC::roc(test_sh_tk2_n$ketluan_hoichungdown, prediction_rf_sh_tk2[,1])
+coords_rf_sh_tk2 <- coords(rp_rf_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sh_tk2 xgb model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sh_tk2 <- train(ketluan_hoichungdown~., data = train_sh_tk2_n, method = "xgbTree", trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"), verbosity = 0)
+
+# Test the model on test set
+set.seed(123)
+prediction_xgb_sh_tk2 <- predict(xgb_sh_tk2, newdata = test_sh_tk2_n, type = "prob")
+
+# Draw the ROC
+cf_xgb_sh_tk2 <- plot.roc(test_sh_tk2_n$ketluan_hoichungdown, prediction_xgb_sh_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_xgb_sh_tk2 <- pROC::roc(test_sh_tk2_n$ketluan_hoichungdown, prediction_xgb_sh_tk2[,1])
+coords_xgb_sh_tk2 <- coords(rp_xgb_sh_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sash_tk2, include=FALSE}
+# Get ultrasound trimester 2 ultrasound and biochemical data
+sash_tk2 <- data %>%
+  filter(sieuamkythun == 2,
+         !is.na(tuoime),
+         !is.na(tuoithai),
+         !is.na(tiensusinhconhoichungdown),
+         !is.na(dau_duongkinhluongdinh),
+         !is.na(dau_chuvidau),
+         # !is.na(dau_naothatben),
+         # !is.na(mat_khoangcach2homat),
+         # !is.na(mat_xuongsongmui),
+         !is.na(mat_moimui),
+         !is.na(nguc_nhiptimthai),
+         !is.na(nguc_ditattim),
+         !is.na(t_mom_ue3),
+         !is.na(t_mom_afp),
+         !is.na(t_mom_hcg),
+         !is.na(chi_chieudaixuongdui),
+         !is.na(ketluan_hoichungdown)) %>%
+  select(dulieu_kiemdinh,
+         tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         mat_moimui,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         t_mom_ue3,
+         t_mom_afp,
+         t_mom_hcg,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r impute data for trimester 2 ultrasound and biochemical data, include=FALSE}
+# Get the data set without dependent variable ketluan_hoichungdown
+sash_tk2_impute_model_data <- sash_tk2[, !(colnames(sash_tk2) == "ketluan_hoichungdown")]
+
+ignore <- sash_tk2_impute_model_data$dulieu_kiemdinh == 1
+
+# Train and impute the data set
+sash_tk2_imputed <- mice(sash_tk2_impute_model_data, ignore = ignore, seed = 123, method = "rf")
+
+rm(sash_tk2_impute_model_data)
+
+# Impute missing values in testing set
+sash_tk2_imputed <- complete(sash_tk2_imputed)
+
+sash_tk2_imputed <- cbind(sash_tk2_imputed, sash_tk2[, c("ketluan_hoichungdown")])
+```
+
+```{r train_sash_tk2, include=FALSE}
+# Get ultrasound and biochemical semeter 2 training data
+train_sash_tk2 <- sash_tk2_imputed %>%
+  filter(dulieu_kiemdinh == 0) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         mat_moimui,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         t_mom_ue3,
+         t_mom_afp,
+         t_mom_hcg,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r test_sash_tk2, include=FALSE}
+# Get ultrasound and biochemical semeter 2 testing data
+test_sash_tk2 <- sash_tk2 %>%
+  filter(dulieu_kiemdinh == 1,
+         !is.na(t_mom_ue3),
+         !is.na(t_mom_afp),
+         !is.na(t_mom_hcg),) %>%
+  select(tuoime,
+         tuoithai,
+         tiensusinhconhoichungdown,
+         dau_duongkinhluongdinh,
+         dau_chuvidau,
+         #dau_naothatben,
+         mat_moimui,
+         #mat_khoangcach2homat,
+         #mat_xuongsongmui,
+         nguc_nhiptimthai,
+         nguc_ditattim,
+         t_mom_ue3,
+         t_mom_afp,
+         t_mom_hcg,
+         chi_chieudaixuongdui,
+         ketluan_hoichungdown)
+```
+
+```{r smote_sash_tk2, include=FALSE}
+# Perform SMOTE oversampling method
+set.seed(123)
+train_sash_tk2$ketluan_hoichungdown = as.factor(train_sash_tk2$ketluan_hoichungdown)
+smote_train_sash_tk2 <- smotenc(train_sash_tk2, var = "ketluan_hoichungdown", k = 5, over_ratio = 1)
+
+# smote_train_sash_tk2 <- SMOTE(ketluan_hoichungdown ~ ., data = data.frame(train_sash_tk2), perc.over = 400)
+# 
+# # Remove rows with ketluan_hoichungdown == 1 from sash_tk2
+# train_sash_tk2 <- train_sash_tk2[train_sash_tk2$ketluan_hoichungdown != "Yes", ]
+# 
+# # Append rows with ketluan_hoichungdown == 1 from smote_sash_tk2
+# train_sash_tk2 <- rbind(train_sash_tk2, smote_train_sash_tk2[smote_train_sash_tk2$ketluan_hoichungdown == "Yes", ])
+# 
+# rm(smote_train_sash_tk2)
+```
+
+```{r sash_tk2 normalization, include=FALSE}
+# Normalize training data
+train_sash_tk2_n <- as.data.frame(lapply(smote_train_sash_tk2[,c("tuoime",
+                                                                 "tuoithai",
+                                                                 "dau_duongkinhluongdinh",
+                                                                 "dau_chuvidau",
+                                                                 #"dau_naothatben",
+                                                                 #"mat_khoangcach2homat",
+                                                                 #"mat_xuongsongmui",
+                                                                 "nguc_nhiptimthai",
+                                                                 "t_mom_ue3",
+                                                                 "t_mom_afp",
+                                                                 "t_mom_hcg",
+                                                                 "chi_chieudaixuongdui")], normalize))
+
+train_sash_tk2_n <- cbind(train_sash_tk2_n, smote_train_sash_tk2[, c("tiensusinhconhoichungdown",
+                                                                     "mat_moimui",
+                                                                     "nguc_ditattim",
+                                                                     "ketluan_hoichungdown")])
+
+# Normalize testing data
+test_sash_tk2_n <- as.data.frame(lapply(test_sash_tk2[,c("tuoime",
+                                                         "tuoithai",
+                                                         "dau_duongkinhluongdinh",
+                                                         "dau_chuvidau",
+                                                         #"dau_naothatben",
+                                                         #"mat_khoangcach2homat",
+                                                         #"mat_xuongsongmui",
+                                                         "nguc_nhiptimthai",
+                                                         "t_mom_ue3",
+                                                         "t_mom_afp",
+                                                         "t_mom_hcg",
+                                                         "chi_chieudaixuongdui")], normalize))
+
+test_sash_tk2_n <- cbind(test_sash_tk2_n, test_sash_tk2[, c("tiensusinhconhoichungdown",
+                                                            "mat_moimui",
+                                                            "nguc_ditattim",
+                                                            "ketluan_hoichungdown")])
+```
+
+```{r sash_tk2 knn model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+knn_sash_tk2 <- train(ketluan_hoichungdown~., data=train_sash_tk2_n, method="knn", trControl=trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_knn_sash_tk2 <- predict(knn_sash_tk2, newdata = test_sash_tk2_n, type = "prob")
+
+# Draw the ROC
+cf_knn_sash_tk2 <- plot.roc(test_sash_tk2_n$ketluan_hoichungdown, prediction_knn_sash_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_knn_sash_tk2 <- pROC::roc(test_sash_tk2_n$ketluan_hoichungdown, prediction_knn_sash_tk2[,1])
+coords_knn_sash_tk2 <- coords(rp_knn_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sash_tk2 svm model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+svm_sash_tk2 <- train(ketluan_hoichungdown~., data = train_sash_tk2_n, method = "svmLinear", trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_svm_sash_tk2 <- predict(svm_sash_tk2, newdata = test_sash_tk2_n, type = "prob")
+
+# Draw the ROC
+cf_svm_sash_tk2 <- plot.roc(test_sash_tk2_n$ketluan_hoichungdown, prediction_svm_sash_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_svm_sash_tk2 <- pROC::roc(test_sash_tk2_n$ketluan_hoichungdown, prediction_svm_sash_tk2[,1])
+coords_svm_sash_tk2 <- coords(rp_svm_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sash_tk2 rf model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+rf_sash_tk2 <- train(ketluan_hoichungdown~., data = train_sash_tk2_n, method = "rf", ntree = 2000, max_depth = 3, trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"))
+
+# Test the model on test set
+set.seed(123)
+prediction_rf_sash_tk2 <- predict(rf_sash_tk2, newdata = test_sash_tk2_n, type = "prob")
+
+# Draw the ROC
+cf_rf_sash_tk2 <- plot.roc(test_sash_tk2_n$ketluan_hoichungdown, prediction_rf_sash_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_rf_sash_tk2 <- pROC::roc(test_sash_tk2_n$ketluan_hoichungdown, prediction_rf_sash_tk2[,1])
+coords_rf_sash_tk2 <- coords(rp_rf_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+```{r sash_tk2 xgb model, include=FALSE}
+# Declare training method and metric
+trainControl <- trainControl(method="cv", number=10, classProbs = TRUE, summaryFunction = MySummary)
+
+# Train the model
+set.seed(123)
+xgb_sash_tk2 <- train(ketluan_hoichungdown~., data = train_sash_tk2_n, method = "xgbTree", trControl = trainControl, metric = "Sens", preProcess = c("center","scale","nzv","pca"), verbosity = 0)
+
+# Test the model on test set
+set.seed(123)
+prediction_xgb_sash_tk2 <- predict(xgb_sash_tk2, newdata = test_sash_tk2_n, type = "prob")
+
+# Draw the ROC
+cf_xgb_sash_tk2 <- plot.roc(test_sash_tk2_n$ketluan_hoichungdown, prediction_xgb_sash_tk2[,1], percent=TRUE, ci=TRUE, print.auc=TRUE, of="thresholds", thresholds="best", print.thres="best")
+
+# Report more information
+rp_xgb_sash_tk2 <- pROC::roc(test_sash_tk2_n$ketluan_hoichungdown, prediction_xgb_sash_tk2[,1])
+coords_xgb_sash_tk2 <- coords(rp_xgb_sash_tk2, "best", ret=c("threshold", "auc", "specificity", "sensitivity", "ppv", "npv", "accuracy", "tp", "tn", "fp", "fn"))
+```
+
+## **The process of making machine learning models**
+
+### **Data overview**
+
+```{r data overview, echo=FALSE, fig.align="center", fig.cap="\\label{fig:data-overview}Data Overview", fig.height=15, fig.width=12, out.height = "90%"}
+# Make boxes
+overview_data <- boxGrob(glue("Total data set included training and testing data",
+                              "Down: n = {a}",
+                              "Not Down: n = {b}",
+                              a = table(data$ketluan_hoichungdown)["Yes"],
+                              b = table(data$ketluan_hoichungdown)["No"],
+                              .sep = "\n",
+                              # width=unit(2, "cm"),
+                              txt_gp = gpar(fontsize = 12),
+                              x = 0.5,
+                              y = 1))
+
+overview_sa_tk1 <- boxGrob(glue("trimester 1", " ultrasound data",
+                                "Down: n = {a}",
+                                "Not Down: n = {b}",
+                                a = table(sa_tk1$ketluan_hoichungdown)["Yes"],
+                                b = table(sa_tk1$ketluan_hoichungdown)["No"],
+                                .sep = "\n",
+                                # width=unit(2, "cm"),
+                                txt_gp = gpar(fontsize = 12),
+                                x = 0.8,
+                                y = 0.5))
+
+overview_train_sa_tk1 <- boxGrob(glue("trimester 1", "ultrasound training data",
+                                      "Down: n = {a}",
+                                      "Not Down: n = {b}",
+                                      a = table(train_sa_tk1$ketluan_hoichungdown)["Yes"],
+                                      b = table(train_sa_tk1$ketluan_hoichungdown)["No"],
+                                      .sep = "\n",
+                                      # width=unit(2, "cm"),
+                                      # txt_gp = gpar(fontsize = 10)
+                                      ))
+
+overview_test_sa_tk1 <- boxGrob(glue("trimester 1", "ultrasound testing data",
+                                     "Down: n = {a}",
+                                     "Not Down: n = {b}",
+                                     a = table(test_sa_tk1$ketluan_hoichungdown)["Yes"],
+                                     b = table(test_sa_tk1$ketluan_hoichungdown)["No"],
+                                     .sep = "\n",
+                                     # width=unit(2, "cm"),
+                                     # txt_gp = gpar(fontsize = 10)
+                                     ))
+
+overview_sh_tk1 <- boxGrob(glue("trimester 1", "biochemical data",
+                                "Down: n = {a}",
+                                "Not Down: n = {b}",
+                                a = table(sh_tk1$ketluan_hoichungdown)["Yes"],
+                                b = table(sh_tk1$ketluan_hoichungdown)["No"],
+                                .sep = "\n",
+                                # width=unit(2, "cm"),
+                                txt_gp = gpar(fontsize = 12),
+                                x = 0.8,
+                                y = 0.5))
+
+overview_train_sh_tk1 <- boxGrob(glue("trimester 1", "biochemical training data",
+                                      "Down: n = {a}",
+                                      "Not Down: n = {b}",
+                                      a = table(train_sh_tk1$ketluan_hoichungdown)["Yes"],
+                                      b = table(train_sh_tk1$ketluan_hoichungdown)["No"],
+                                      .sep = "\n",
+                                      # width=unit(2, "cm"),
+                                      # txt_gp = gpar(fontsize = 10)
+                                      ))
+
+overview_test_sh_tk1 <- boxGrob(glue("trimester 1", "biochemical testing data",
+                                     "Down: n = {a}",
+                                     "Not Down: n = {b}",
+                                     a = table(test_sh_tk1$ketluan_hoichungdown)["Yes"],
+                                     b = table(test_sh_tk1$ketluan_hoichungdown)["No"],
+                                     .sep = "\n",
+                                     # width=unit(2, "cm"),
+                                     # txt_gp = gpar(fontsize = 10)
+                                     ))
+
+overview_sash_tk1 <- boxGrob(glue("trimester 1", "ultrasound and biochemical data",
+                                  "Down: n = {a}",
+                                  "Not Down: n = {b}",
+                                  a = table(sash_tk1$ketluan_hoichungdown)["Yes"],
+                                  b = table(sash_tk1$ketluan_hoichungdown)["No"],
+                                  .sep = "\n",
+                                  # width=unit(2, "cm"),
+                                  txt_gp = gpar(fontsize = 12),
+                                  x = 0.6,
+                                  y = 0.5))
+
+overview_train_sash_tk1 <- boxGrob(glue("trimester 1", "combined training data",
+                                        "Down: n = {a}",
+                                        "Not Down: n = {b}",
+                                        a = table(train_sash_tk1$ketluan_hoichungdown)["Yes"],
+                                        b = table(train_sash_tk1$ketluan_hoichungdown)["No"],
+                                        .sep = "\n",
+                                        # width=unit(2, "cm"),
+                                        # txt_gp = gpar(fontsize = 5)
+                                        ))
+
+overview_test_sash_tk1 <- boxGrob(glue("trimester 1", "combined testing data",
+                                       "Down: n = {a}",
+                                       "Not Down: n = {b}",
+                                       a = table(test_sash_tk1$ketluan_hoichungdown)["Yes"],
+                                       b = table(test_sash_tk1$ketluan_hoichungdown)["No"],
+                                       .sep = "\n",
+                                       # width=unit(2, "cm"),
+                                       # txt_gp = gpar(fontsize = 5)
+                                       ))
+
+overview_sa_tk2 <- boxGrob(glue("trimester 2", "ultrasound data",
+                                "Down: n = {a}",
+                                "Not Down: n = {b}",
+                                a = table(sa_tk2$ketluan_hoichungdown)["Yes"],
+                                b = table(sa_tk2$ketluan_hoichungdown)["No"],
+                                .sep = "\n",
+                                # width=unit(2, "cm"),
+                                txt_gp = gpar(fontsize = 12),
+                                x = 0.4,
+                                y = 0.5))
+
+overview_train_sa_tk2 <- boxGrob(glue("trimester 2", "ultrasound training data",
+                                      "Down: n = {a}",
+                                      "Not Down: n = {b}",
+                                      a = table(train_sa_tk2$ketluan_hoichungdown)["Yes"],
+                                      b = table(train_sa_tk2$ketluan_hoichungdown)["No"],
+                                      .sep = "\n",
+                                      # width=unit(2, "cm"),
+                                      # txt_gp = gpar(fontsize = 5)
+                                      ))
+
+overview_test_sa_tk2 <- boxGrob(glue("trimester 2", "ultrasound testing data",
+                                     "Down: n = {a}",
+                                     "Not Down: n = {b}",
+                                     a = table(test_sa_tk2$ketluan_hoichungdown)["Yes"],
+                                     b = table(test_sa_tk2$ketluan_hoichungdown)["No"],
+                                     .sep = "\n",
+                                     # width=unit(2, "cm"),
+                                     # txt_gp = gpar(fontsize = 5)
+                                     ))
+
+overview_sh_tk2 <- boxGrob(glue("trimester 2", "biochemical data",
+                                "Down: n = {a}",
+                                "Not Down: n = {b}",
+                                a = table(sh_tk2$ketluan_hoichungdown)["Yes"],
+                                b = table(sh_tk2$ketluan_hoichungdown)["No"],
+                                .sep = "\n",
+                                # width=unit(2, "cm"),
+                                txt_gp = gpar(fontsize = 12),
+                                x = 0.4,
+                                y = 0.5))
+
+overview_train_sh_tk2 <- boxGrob(glue("trimester 2", "biochemical training data",
+                                      "Down: n = {a}",
+                                      "Not Down: n = {b}",
+                                      a = table(train_sh_tk2$ketluan_hoichungdown)["Yes"],
+                                      b = table(train_sh_tk2$ketluan_hoichungdown)["No"],
+                                      .sep = "\n",
+                                      # width=unit(2, "cm"),
+                                      # txt_gp = gpar(fontsize = 5)
+                                      ))
+
+overview_test_sh_tk2 <- boxGrob(glue("trimester 2", "biochemical testing data",
+                                     "Down: n = {a}",
+                                     "Not Down: n = {b}",
+                                     a = table(test_sh_tk2$ketluan_hoichungdown)["Yes"],
+                                     b = table(test_sh_tk2$ketluan_hoichungdown)["No"],
+                                     .sep = "\n",
+                                     # width=unit(2, "cm"),
+                                     # txt_gp = gpar(fontsize = 5)
+                                     ))
+
+overview_sash_tk2 <- boxGrob(glue("trimester 2", "ultrasound and biochemical data",
+                                  "Down: n = {a}",
+                                  "Not Down: n = {b}",
+                                  a = table(sash_tk2$ketluan_hoichungdown)["Yes"],
+                                  b = table(sash_tk2$ketluan_hoichungdown)["No"],
+                                  .sep = "\n",
+                                  # width=unit(2, "cm"),
+                                  txt_gp = gpar(fontsize = 12),
+                                  x = 0.2,
+                                  y = 0.5))
+
+overview_train_sash_tk2 <- boxGrob(glue("trimester 2", "combined training data",
+                                        "Down: n = {a}",
+                                        "Not Down: n = {b}",
+                                        a = table(train_sash_tk2$ketluan_hoichungdown)["Yes"],
+                                        b = table(train_sash_tk2$ketluan_hoichungdown)["No"],
+                                        .sep = "\n",
+                                        # width=unit(2, "cm"),
+                                        # txt_gp = gpar(fontsize = 5)
+                                        ))
+
+overview_test_sash_tk2 <- boxGrob(glue("trimester 2", "combined testing data",
+                                       "Down: n = {a}",
+                                       "Not Down: n = {b}",
+                                       a = table(test_sash_tk2$ketluan_hoichungdown)["Yes"],
+                                       b = table(test_sash_tk2$ketluan_hoichungdown)["No"],
+                                       .sep = "\n",
+                                       # width=unit(2, "cm"),
+                                       # txt_gp = gpar(fontsize = 5)
+                                       ))
+
+# Draw the boxes
+grid.newpage()
+
+vert1 <- spreadHorizontal(overview_data = overview_data,
+                          grps1 = overview_sash_tk2,
+                          grps2 = overview_test_sash_tk2)
+grps1 <- alignHorizontal(reference = vert1$grps1,
+                         overview_sa_tk1 = overview_sa_tk1,
+                         overview_sh_tk1 = overview_sh_tk1,
+                         overview_sash_tk1 = overview_sash_tk1,
+                         overview_sa_tk2 = overview_sa_tk2,
+                         overview_sh_tk2 = overview_sh_tk2,
+                         overview_sash_tk2 = overview_sash_tk2) %>%
+  spreadVertical()
+vert1$grps1 <- NULL
+grps2 <- alignHorizontal(reference = vert1$grps2,
+                         overview_train_sa_tk1 = overview_train_sa_tk1,
+                         overview_test_sa_tk1 = overview_test_sa_tk1,
+                         overview_train_sh_tk1 = overview_train_sh_tk1,
+                         overview_test_sh_tk1 = overview_test_sh_tk1,                         
+                         overview_train_sash_tk1 = overview_train_sash_tk1,
+                         overview_test_sash_tk1 = overview_test_sash_tk1,
+                         overview_train_sa_tk2 = overview_train_sa_tk2,
+                         overview_test_sa_tk2 = overview_test_sa_tk2,
+                         overview_train_sh_tk2 = overview_train_sh_tk2,
+                         overview_test_sh_tk2 = overview_test_sh_tk2,
+                         overview_train_sash_tk2 = overview_train_sash_tk2,
+                         overview_test_sash_tk2 = overview_test_sash_tk2) %>%
+  spreadVertical()
+vert1$grps2 <- NULL
+
+connectGrob(vert1$overview_data, grps1$overview_sa_tk1, type = "L")
+connectGrob(vert1$overview_data, grps1$overview_sh_tk1, type = "L")
+connectGrob(vert1$overview_data, grps1$overview_sash_tk1, type = "L")
+connectGrob(vert1$overview_data, grps1$overview_sa_tk2, type = "L")
+connectGrob(vert1$overview_data, grps1$overview_sh_tk2, type = "L")
+connectGrob(vert1$overview_data, grps1$overview_sash_tk2, type = "L")
+connectGrob(grps1$overview_sa_tk1, grps2$overview_train_sa_tk1, type = "L")
+connectGrob(grps1$overview_sa_tk1, grps2$overview_test_sa_tk1, type = "L")
+connectGrob(grps1$overview_sh_tk1, grps2$overview_train_sh_tk1, type = "L")
+connectGrob(grps1$overview_sh_tk1, grps2$overview_test_sh_tk1, type = "L")
+connectGrob(grps1$overview_sash_tk1, grps2$overview_train_sash_tk1, type = "L")
+connectGrob(grps1$overview_sash_tk1, grps2$overview_test_sash_tk1, type = "L")
+connectGrob(grps1$overview_sa_tk2, grps2$overview_train_sa_tk2, type = "L")
+connectGrob(grps1$overview_sa_tk2, grps2$overview_test_sa_tk2, type = "L")
+connectGrob(grps1$overview_sh_tk2, grps2$overview_train_sh_tk2, type = "L")
+connectGrob(grps1$overview_sh_tk2, grps2$overview_test_sh_tk2, type = "L")
+connectGrob(grps1$overview_sash_tk2, grps2$overview_train_sash_tk2, type = "L")
+connectGrob(grps1$overview_sash_tk2, grps2$overview_test_sash_tk2, type = "L")
+
+vert1
+grps1
+grps2
+```
+
+Figure \ref{fig:data-overview} shows an overview of the data set and how the initial data set is broken down into sub-data sets that are used to build different Down-screening modules. More specifically, the original data set included 1185 cases of Down and 8660 cases without Down. This data set was then split into 6 different data sets for 6 different modules including 2 trimesters and 3 modules each trimester which are ultrasound only, biochemical only and the combination of both ultrasound and biochemical. Selected cases in each data set should have all the corresponding variables which means one case in trimester 1 biochemical data set must not have missing in any of the variables nuchal translucency, β-hCG or PAPP-A. In order to build machine learning models and test them, each of these 6 data set were divided into training set for model training and evaluation and testing set for model testing. The ultrasound data set is larger than the biochemical data in both trimester and trimester 2 has more observations than trimester 1.
+
+### **Detail process**
+
+```{r detail process, echo=FALSE, fig.align="center", fig.cap="Data Overview", fig.height=8, fig.width=10}
+detail_process1 <- boxGrob(glue("Data set for model training"))
+detail_process2 <- boxGrob(glue("Data cleansing"))
+detail_process3 <- boxGrob(glue("Feature importance calculation"))
+detail_process4 <- boxGrob(glue("Data preprocessing:",
+                                "Normalize data",
+                                "Oversampling Down cases using SMOTENC",
+                                .sep = "\n"))
+detail_process5 <- boxGrob(glue("Train K-nearest neighbor model",
+                                "10-Fold CV",
+                                "3 x repeated",
+                                .sep = "\n"))
+detail_process6 <- boxGrob(glue("Train Support Vector Machine model",
+                                "10-Fold CV",
+                                "3 x repeated",
+                                .sep = "\n"))
+detail_process7 <- boxGrob(glue("Train Random Forest model",
+                                "10-Fold CV",
+                                "3 x repeated",
+                                .sep = "\n"))
+detail_process8 <- boxGrob(glue("Train XGboost model",
+                                "10-Fold CV",
+                                "3 x repeated",
+                                .sep = "\n"))
+detail_process9 <- boxGrob(glue("Evaluate model performance"))
+detail_process10 <- boxGrob(glue("Evaluate model performance"))
+detail_process11 <- boxGrob(glue("Evaluate model performance"))
+detail_process12 <- boxGrob(glue("Evaluate model performance"))
+detail_process13 <- boxGrob(glue("Test model using testing set"))
+detail_process14 <- boxGrob(glue("Test model using testing set"))
+detail_process15 <- boxGrob(glue("Test model using testing set"))
+detail_process16 <- boxGrob(glue("Test model using testing set"))
+
+grid.newpage()
+vert <- spreadVertical(detail_process1 = detail_process1,
+                       detail_process2 = detail_process2,
+                       detail_process4 = detail_process4,
+                       detail_process5 = detail_process5,
+                       detail_process9 = detail_process9,
+                       detail_process13 = detail_process13)
+grps1 <- alignVertical(reference = vert$detail_process5,
+                      detail_process5 = detail_process5,
+                      detail_process6 = detail_process6,
+                      detail_process7 = detail_process7,
+                      detail_process8 = detail_process8) %>%
+  spreadHorizontal()
+
+grps2 <- alignVertical(reference = vert$detail_process9,
+                       detail_process9 = detail_process9,
+                       detail_process10 = detail_process10,
+                       detail_process11 = detail_process11,
+                       detail_process12 = detail_process12) %>%
+  spreadHorizontal()
+
+grps3 <- alignVertical(reference = vert$detail_process13,
+                       detail_process13 = detail_process13,
+                       detail_process14 = detail_process14,
+                       detail_process15 = detail_process15,
+                       detail_process16 = detail_process16) %>%
+  spreadHorizontal()
+
+vert$detail_process5 <- NULL
+vert$detail_process9 <- NULL
+vert$detail_process13 <- NULL
+
+detail_process3 <- moveBox(detail_process3,
+                   x = .8,
+                   y = Gmisc::coords(vert$detail_process4)$top + distance(vert$detail_process4, vert$detail_process2, half = TRUE, center = FALSE))
+
+connectGrob(vert$detail_process1, vert$detail_process2, type = "v")
+connectGrob(vert$detail_process2, vert$detail_process4, type = "v")
+connectGrob(vert$detail_process2, detail_process3, type = "L")
+connectGrob(vert$detail_process4, grps1$detail_process5, type = "N")
+connectGrob(vert$detail_process4, grps1$detail_process6, type = "N")
+connectGrob(vert$detail_process4, grps1$detail_process7, type = "N")
+connectGrob(vert$detail_process4, grps1$detail_process8, type = "N")
+connectGrob(grps1$detail_process5, grps2$detail_process9, type = "v")
+connectGrob(grps1$detail_process6, grps2$detail_process10, type = "v")
+connectGrob(grps1$detail_process7, grps2$detail_process11, type = "v")
+connectGrob(grps1$detail_process8, grps2$detail_process12, type = "v")
+connectGrob(grps2$detail_process9, grps3$detail_process13, type = "v")
+connectGrob(grps2$detail_process10, grps3$detail_process14, type = "v")
+connectGrob(grps2$detail_process11, grps3$detail_process15, type = "v")
+connectGrob(grps2$detail_process12, grps3$detail_process16, type = "v")
+
+vert
+grps1
+grps2
+grps3
+detail_process3
+```
+
+All 6 training and testing data set were cleansed and pre-processed through normalization. In addition, training data set were used to calculate feature importance in order to find which variable was the most important in predicting Down Syndrome, then they are fed to 4 machine learning models which were k-nearest neighbor, Support Vector Machine, Random Forest and XGBoost, result in a total of 24 different machine learning models. Each model was trained using 10-fold cross-validation (90% of data used for training and 10% were used for validating) and 3 x repeated method. Finally, all of 24 models were tested using the test set.
+
+### **Characteristics of participants in each data set**
+
+```{r sa_tk1 table, echo=FALSE}
+sa_tk1$tiensusinhconhoichungdown <- factor(sa_tk1$tiensusinhconhoichungdown, levels = c(0,1), labels = c("No", "Yes"))
+sa_tk1$mat_moimui <- factor(sa_tk1$mat_moimui, levels = c(0,1), labels = c("No", "Yes"))
+sa_tk1$dulieu_kiemdinh <- factor(sa_tk1$dulieu_kiemdinh, levels = c(0,1), labels = c("Training", "Testing"))
+sa_tk1$ketluan_hoichungdown <- factor(sa_tk1$ketluan_hoichungdown, levels = c("No", "Yes"), labels = c("Not Down", "Down"))
+
+label(sa_tk1$tuoime) <- "Mother's age"
+label(sa_tk1$tuoithai) <- "Fetus's age"
+label(sa_tk1$tiensusinhconhoichungdown) <- "History of having children with Down syndrome"
+label(sa_tk1$chieudaidaumong) <- "Fetal crown-rump length"
+label(sa_tk1$dau_duongkinhluongdinh) <- "Biparietal diameter"
+label(sa_tk1$dau_chuvidau) <- "Head circumference"
+label(sa_tk1$mat_moimui) <- "Fetal have nose"
+label(sa_tk1$nguc_nhiptimthai) <- "Fetal heart rate"
+label(sa_tk1$d_khoangsangsaugay) <- "Nuchal translucency"
+
+units(sa_tk1$tuoime) <- "years"
+units(sa_tk1$tuoithai) <- "weeks"
+units(sa_tk1$chieudaidaumong) <- "mm"
+units(sa_tk1$dau_duongkinhluongdinh) <- "mm"
+units(sa_tk1$dau_chuvidau) <- "mm"
+units(sa_tk1$nguc_nhiptimthai) <- "times per minute"
+units(sa_tk1$d_khoangsangsaugay) <- "mm"
+
+table_sa_tk1 <- table1(~ tuoime + tuoithai + tiensusinhconhoichungdown + chieudaidaumong + dau_duongkinhluongdinh + dau_chuvidau + mat_moimui + nguc_nhiptimthai + d_khoangsangsaugay | dulieu_kiemdinh*ketluan_hoichungdown, data=sa_tk1, caption = "Ultrasound value in trimester 1 ultrasound data set")
+
+t1kable(table_sa_tk1) |>
+  kable_styling(latex_options = c("HOLD_position", "scale_down"))
+```
+
+```{r sh_tk1 table, echo=FALSE}
+sh_tk1$dulieu_kiemdinh <- factor(sh_tk1$dulieu_kiemdinh, levels = c(0,1), labels = c("Training", "Testing"))
+sh_tk1$ketluan_hoichungdown <- factor(sh_tk1$ketluan_hoichungdown, levels = c("No", "Yes"), labels = c("Not Down", "Down"))
+
+label(sh_tk1$d_khoangsangsaugay) <- "Nuchal translucency"
+label(sh_tk1$d_mom_pappa) <- "PAPP-A"
+label(sh_tk1$d_mom_hcgb) <- "β-hCG"
+
+units(sh_tk1$d_khoangsangsaugay) <- "mm"
+units(sh_tk1$d_mom_pappa) <- "MoM"
+units(sh_tk1$d_mom_hcgb) <- "MoM"
+
+table_sh_tk1 <- table1(~ d_khoangsangsaugay + d_mom_pappa + d_mom_hcgb | dulieu_kiemdinh*ketluan_hoichungdown, data=sh_tk1, caption = "Biochemical value in trimester 1 biochemical data set")
+
+t1kable(table_sh_tk1) |>
+  kable_styling(latex_options = c("HOLD_position", "scale_down"))
+```
+
+```{r sash_tk1 table, echo=FALSE}
+sash_tk1$tiensusinhconhoichungdown <- factor(sash_tk1$tiensusinhconhoichungdown, levels = c(0,1), labels = c("No", "Yes"))
+sash_tk1$mat_moimui <- factor(sash_tk1$mat_moimui, levels = c(0,1), labels = c("No", "Yes"))
+sash_tk1$dulieu_kiemdinh <- factor(sash_tk1$dulieu_kiemdinh, levels = c(0,1), labels = c("Training", "Testing"))
+sash_tk1$ketluan_hoichungdown <- factor(sash_tk1$ketluan_hoichungdown, levels = c("No", "Yes"), labels = c("Not Down", "Down"))
+
+label(sash_tk1$tuoime) <- "Mother's age"
+label(sash_tk1$tuoithai) <- "Fetus's age"
+label(sash_tk1$tiensusinhconhoichungdown) <- "History of having children with Down syndrome"
+label(sash_tk1$chieudaidaumong) <- "Fetal crown-rump length"
+label(sash_tk1$dau_duongkinhluongdinh) <- "Biparietal diameter"
+label(sash_tk1$dau_chuvidau) <- "Head circumference"
+label(sash_tk1$mat_moimui) <- "Having nose?"
+label(sash_tk1$nguc_nhiptimthai) <- "Fetal heart rate"
+label(sash_tk1$d_khoangsangsaugay) <- "Nuchal translucency"
+label(sash_tk1$d_mom_pappa) <- "PAPP-A"
+label(sash_tk1$d_mom_hcgb) <- "β-hCG"
+
+units(sash_tk1$tuoime) <- "years"
+units(sash_tk1$tuoithai) <- "weeks"
+units(sash_tk1$chieudaidaumong) <- "mm"
+units(sash_tk1$dau_duongkinhluongdinh) <- "mm"
+units(sash_tk1$dau_chuvidau) <- "mm"
+units(sash_tk1$nguc_nhiptimthai) <- "times per minute"
+units(sash_tk1$d_khoangsangsaugay) <- "mm"
+units(sash_tk1$d_mom_pappa) <- "MoM"
+units(sash_tk1$d_mom_hcgb) <- "MoM"
+
+table_sash_tk1 <- table1(~ tuoime + tuoithai + tiensusinhconhoichungdown + chieudaidaumong + dau_duongkinhluongdinh + dau_chuvidau + mat_moimui + nguc_nhiptimthai + d_khoangsangsaugay + d_mom_pappa + d_mom_hcgb | dulieu_kiemdinh*ketluan_hoichungdown, data=sash_tk1, caption = "Ultrasound and biochemical value in trimester 1 ultrasound and biochemical data set")
+
+t1kable(table_sash_tk1) |>
+  kable_styling(latex_options = c("HOLD_position", "scale_down"))
+```
+
+```{r sa_tk2 table, echo=FALSE}
+sa_tk2$tiensusinhconhoichungdown <- factor(sa_tk2$tiensusinhconhoichungdown, levels = c(0,1), labels = c("No", "Yes"))
+sa_tk2$mat_moimui <- factor(sa_tk2$mat_moimui, levels = c(0,1), labels = c("No", "Yes"))
+sa_tk2$dulieu_kiemdinh <- factor(sa_tk2$dulieu_kiemdinh, levels = c(0,1), labels = c("Training", "Testing"))
+sa_tk2$nguc_ditattim <- factor(sa_tk2$nguc_ditattim, levels = c(0,1), labels = c("No", "Yes"))
+sa_tk2$ketluan_hoichungdown <- factor(sa_tk2$ketluan_hoichungdown, levels = c("No", "Yes"), labels = c("Not Down", "Down"))
+
+label(sa_tk2$tuoime) <- "Mother's age"
+label(sa_tk2$tuoithai) <- "Fetus's age"
+label(sa_tk2$tiensusinhconhoichungdown) <- "History of having children with Down syndrome"
+label(sa_tk2$dau_duongkinhluongdinh) <- "Biparietal diameter"
+label(sa_tk2$dau_chuvidau) <- "Head circumference"
+label(sa_tk2$mat_moimui) <- "Having nose?"
+label(sa_tk2$nguc_nhiptimthai) <- "Fetal heart rate"
+label(sa_tk2$nguc_ditattim) <- "Abnormal fetal heart"
+label(sa_tk2$chi_chieudaixuongdui) <- "Fetal femur length"
+
+units(sa_tk2$tuoime) <- "years"
+units(sa_tk2$tuoithai) <- "weeks"
+units(sa_tk2$dau_duongkinhluongdinh) <- "mm"
+units(sa_tk2$dau_chuvidau) <- "mm"
+units(sa_tk2$nguc_nhiptimthai) <- "times per minute"
+units(sa_tk2$chi_chieudaixuongdui) <- "mm"
+
+table_sa_tk2 <- table1(~ tuoime + tuoithai + tiensusinhconhoichungdown + dau_duongkinhluongdinh + dau_chuvidau + mat_moimui + nguc_nhiptimthai + nguc_ditattim + chi_chieudaixuongdui | dulieu_kiemdinh*ketluan_hoichungdown, data=sa_tk2, caption = "Ultrasound value in trimester 2 ultrasound data set")
+
+t1kable(table_sa_tk2) |>
+  kable_styling(latex_options = c("HOLD_position", "scale_down"))
+```
+
+```{r sh_tk2 table, echo=FALSE}
+sh_tk2$dulieu_kiemdinh <- factor(sh_tk2$dulieu_kiemdinh, levels = c(0,1), labels = c("Training", "Testing"))
+sh_tk2$ketluan_hoichungdown <- factor(sh_tk2$ketluan_hoichungdown, levels = c("No", "Yes"), labels = c("Not Down", "Down"))
+
+label(sh_tk2$t_mom_afp) <- "AFP"
+label(sh_tk2$t_mom_hcg) <- "hCG"
+label(sh_tk2$t_mom_ue3) <- "uE3"
+
+units(sh_tk2$t_mom_afp) <- "MoM"
+units(sh_tk2$t_mom_hcg) <- "MoM"
+units(sh_tk2$t_mom_ue3) <- "MoM"
+
+table_sh_tk2 <- table1(~ t_mom_afp + t_mom_hcg + t_mom_ue3 | dulieu_kiemdinh*ketluan_hoichungdown, data=sh_tk2, caption = "Biochemical value in trimester 2 biochemical data set")
+
+t1kable(table_sh_tk2) |>
+  kable_styling(latex_options = c("HOLD_position", "scale_down"))
+```
+
+```{r sash_tk2 table, echo=FALSE}
+sash_tk2$tiensusinhconhoichungdown <- factor(sash_tk2$tiensusinhconhoichungdown, levels = c(0,1), labels = c("No", "Yes"))
+sash_tk2$mat_moimui <- factor(sash_tk2$mat_moimui, levels = c(0,1), labels = c("No", "Yes"))
+sash_tk2$dulieu_kiemdinh <- factor(sash_tk2$dulieu_kiemdinh, levels = c(0,1), labels = c("Training", "Testing"))
+sash_tk2$nguc_ditattim <- factor(sash_tk2$nguc_ditattim, levels = c(0,1), labels = c("No", "Yes"))
+sash_tk2$ketluan_hoichungdown <- factor(sash_tk2$ketluan_hoichungdown, levels = c("No", "Yes"), labels = c("Not Down", "Down"))
+
+label(sash_tk2$tuoime) <- "Mother's age"
+label(sash_tk2$tuoithai) <- "Fetus's age"
+label(sash_tk2$tiensusinhconhoichungdown) <- "History of having children with Down syndrome"
+label(sash_tk2$dau_duongkinhluongdinh) <- "Biparietal diameter"
+label(sash_tk2$dau_chuvidau) <- "Head circumference"
+label(sash_tk2$mat_moimui) <- "Having nose?"
+label(sash_tk2$nguc_nhiptimthai) <- "Fetal heart rate"
+label(sash_tk2$nguc_ditattim) <- "Abnormal fetal heart"
+label(sash_tk2$chi_chieudaixuongdui) <- "Fetal femur length"
+label(sash_tk2$t_mom_afp) <- "AFP"
+label(sash_tk2$t_mom_hcg) <- "hCG"
+label(sash_tk2$t_mom_ue3) <- "uE3"
+
+units(sash_tk2$tuoime) <- "years"
+units(sash_tk2$tuoithai) <- "weeks"
+units(sash_tk2$dau_duongkinhluongdinh) <- "mm"
+units(sash_tk2$dau_chuvidau) <- "mm"
+units(sash_tk2$nguc_nhiptimthai) <- "times per minute"
+units(sash_tk2$chi_chieudaixuongdui) <- "mm"
+units(sash_tk2$t_mom_afp) <- "MoM"
+units(sash_tk2$t_mom_hcg) <- "MoM"
+units(sash_tk2$t_mom_ue3) <- "MoM"
+
+table_sash_tk2 <- table1(~ tuoime + tuoithai + tiensusinhconhoichungdown + dau_duongkinhluongdinh + dau_chuvidau + mat_moimui + nguc_nhiptimthai + nguc_ditattim + chi_chieudaixuongdui + t_mom_afp + t_mom_hcg + t_mom_ue3 | dulieu_kiemdinh*ketluan_hoichungdown, data=sash_tk2, caption = "Ultrasound and biochemical value in trimester 2 ultrasound and biochemical data set")
+
+t1kable(table_sash_tk2) |>
+  kable_styling(latex_options = c("HOLD_position", "scale_down"))
+```
+
+### **Feature importance of each data set**
+
+```{r feature_sa_tk1, echo=FALSE, fig.align="center", fig.cap="\\label{fig:satk1-varimp}Ranking variables importance in trimester 1 ultrasound", warning=FALSE}
+set.seed(123)
+train_sa_tk1$ketluan_hoichungdown = as.factor(train_sa_tk1$ketluan_hoichungdown)
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+
+# label variables
+label(train_sa_tk1$tuoime) <- "Mother's age"
+label(train_sa_tk1$tuoithai) <- "Fetus's age"
+label(train_sa_tk1$tiensusinhconhoichungdown) <- "History of having children with Down syndrome"
+label(train_sa_tk1$chieudaidaumong) <- "Fetal crown-rump length"
+label(train_sa_tk1$dau_duongkinhluongdinh) <- "Biparietal diameter"
+label(train_sa_tk1$dau_chuvidau) <- "Head circumference"
+label(train_sa_tk1$mat_moimui) <- "Fetal have nose"
+label(train_sa_tk1$nguc_nhiptimthai) <- "Fetal heart rate"
+label(train_sa_tk1$d_khoangsangsaugay) <- "Nuchal translucency"
+
+# train the model
+model <- train(ketluan_hoichungdown~., data=train_sa_tk1, method="lvq", preProcess="scale", trControl=control)
+
+# estimate variable importance
+importance_sa_tk1 <- varImp(model, scale=FALSE)
+
+# plot importance
+plot(importance_sa_tk1)
+```
+
+In the trimester 1 ultrasound data set, the importance of 9 variables in the prediction of Down Syndrome could be seen in figure \ref{fig:satk1-varimp}. The feature on top was the one contributed the most to the prediction of Down Syndrome and the one at the bottom contributed the least in this data set. Therefore, nuchal translucency was the most important variable and history of having children with Down Syndrome had the lowest importance in the prediction of the outcome.
+
+```{r feature_sh_tk1, echo=FALSE, fig.align="center", fig.cap="\\label{fig:shtk1-varimp}Ranking variables importance in trimester 1 biochemical", warning=FALSE}
+set.seed(123)
+train_sh_tk1$ketluan_hoichungdown = as.factor(train_sh_tk1$ketluan_hoichungdown)
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+
+# label variables
+label(train_sh_tk1$d_khoangsangsaugay) <- "Nuchal translucency"
+label(train_sh_tk1$d_mom_pappa) <- "PAPP-A"
+label(train_sh_tk1$d_mom_hcgb) <- "β-hCG"
+
+# train the model
+model <- train(ketluan_hoichungdown~., data=train_sh_tk1, method="lvq", preProcess="scale", trControl=control)
+
+# estimate variable importance
+importance_sh_tk1 <- varImp(model, scale=FALSE)
+
+# plot importance
+plot(importance_sh_tk1)
+```
+
+In addition, nuchal translucency was the most important variable in the trimester 1 biochemical data set as shown in figure \ref{fig:shtk1-varimp}, followed by β-hCG and PAPP-A.
+
+```{r feature_sash_tk1, echo=FALSE, fig.align="center", fig.cap="Ranking variables importance in trimester 1 ultrasound and biochemical data", warning=FALSE}
+set.seed(123)
+train_sash_tk1$ketluan_hoichungdown = as.factor(train_sash_tk1$ketluan_hoichungdown)
+control <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+# label variables
+label(train_sash_tk1$tuoime) <- "Mother's age"
+label(train_sash_tk1$tuoithai) <- "Fetus's age"
+label(train_sash_tk1$tiensusinhconhoichungdown) <- "History of having children with Down syndrome"
+label(train_sash_tk1$chieudaidaumong) <- "Fetal crown-rump length"
+label(train_sash_tk1$dau_duongkinhluongdinh) <- "Biparietal diameter"
+label(train_sash_tk1$dau_chuvidau) <- "Head circumference"
+label(train_sash_tk1$mat_moimui) <- "Having nose?"
+label(train_sash_tk1$nguc_nhiptimthai) <- "Fetal heart rate"
+label(train_sash_tk1$d_khoangsangsaugay) <- "Nuchal translucency"
+label(train_sash_tk1$d_mom_pappa) <- "PAPP-A"
+label(train_sash_tk1$d_mom_hcgb) <- "β-hCG"
+
+# Train the model
+model <- train(ketluan_hoichungdown ~ ., data = train_sash_tk1, method = "lvq", preProcess = "scale", trControl = control)
+
+# Estimate variable importance
+importance_sash_tk1 <- varImp(model, scale = FALSE)
+
+# plot importance
+plot(importance_sash_tk1)
+```
+
+And finally, in the data set that had both ultrasound and biochemical data, nuchal translucency and biochemical variables continued to be most important features in the whole data set.
+
+```{r feature_sa_tk2, fig.cap= "Ranking variables importance in trimester 2 ultrasound data", fig.align = "center", echo=FALSE}
+set.seed(123)
+train_sa_tk2$ketluan_hoichungdown = as.factor(train_sa_tk2$ketluan_hoichungdown)
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+
+# label variables
+label(train_sa_tk2$tuoime) <- "Mother's age"
+label(train_sa_tk2$tuoithai) <- "Fetus's age"
+label(train_sa_tk2$tiensusinhconhoichungdown) <- "History of having children with Down syndrome"
+label(train_sa_tk2$dau_duongkinhluongdinh) <- "Biparietal diameter"
+label(train_sa_tk2$dau_chuvidau) <- "Head circumference"
+label(train_sa_tk2$mat_moimui) <- "Having nose?"
+label(train_sa_tk2$nguc_nhiptimthai) <- "Fetal heart rate"
+label(train_sa_tk2$nguc_ditattim) <- "Abnormal fetal heart"
+label(train_sa_tk2$chi_chieudaixuongdui) <- "Fetal femur length"
+
+# train the model
+model <- train(ketluan_hoichungdown~., data=train_sa_tk2, method="lvq", preProcess="scale", trControl=control)
+
+# estimate variable importance
+importance_sa_tk2 <- varImp(model, scale=FALSE)
+
+# plot importance
+plot(importance_sa_tk2)
+```
+
+In trimester 2, nuchal translucency was no longer be used in the prediction models, then fetal femur length was the most important feature in trimester 2 ultrasound data, followed by fetus's age, head circumference and history of having children with Down Syndrome continued to have the lowest importance score.
+
+```{r feature_sh_tk2, echo=FALSE, fig.align="center", fig.cap="\\label{fig:shtk2-varimp}Ranking variables importance in trimester 2 biochemical", warning=FALSE}
+set.seed(123)
+train_sh_tk2$ketluan_hoichungdown = as.factor(train_sh_tk2$ketluan_hoichungdown)
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+
+# label variables
+label(train_sh_tk2$t_mom_afp) <- "AFP"
+label(train_sh_tk2$t_mom_hcg) <- "hCG"
+label(train_sh_tk2$t_mom_ue3) <- "uE3"
+
+# train the model
+model <- train(ketluan_hoichungdown~., data=train_sh_tk2, method="lvq", preProcess="scale", trControl=control)
+
+# estimate variable importance
+importance_sh_tk2 <- varImp(model, scale=FALSE)
+
+# plot importance
+plot(importance_sh_tk2)
+```
+
+As shown in figure \ref{fig:shtk2-varimp}, hCG had the highest importance score in the trimester 2 biochemical data set.
+
+```{r feature_sash_tk2, fig.cap= "Ranking variables importance in trimester 2 ultrasound and biochemical data", fig.align = "center", echo=FALSE}
+set.seed(123)
+train_sash_tk2$ketluan_hoichungdown = as.factor(train_sash_tk2$ketluan_hoichungdown)
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+
+# label variables
+label(train_sash_tk2$tuoime) <- "Mother's age"
+label(train_sash_tk2$tuoithai) <- "Fetus's age"
+label(train_sash_tk2$tiensusinhconhoichungdown) <- "History of having children with Down syndrome"
+label(train_sash_tk2$dau_duongkinhluongdinh) <- "Biparietal diameter"
+label(train_sash_tk2$dau_chuvidau) <- "Head circumference"
+label(train_sash_tk2$mat_moimui) <- "Having nose?"
+label(train_sash_tk2$nguc_nhiptimthai) <- "Fetal heart rate"
+label(train_sash_tk2$nguc_ditattim) <- "Abnormal fetal heart"
+label(train_sash_tk2$chi_chieudaixuongdui) <- "Fetal femur length"
+label(train_sash_tk2$t_mom_afp) <- "AFP"
+label(train_sash_tk2$t_mom_hcg) <- "hCG"
+label(train_sash_tk2$t_mom_ue3) <- "uE3"
+
+# train the model
+model <- train(ketluan_hoichungdown~., data=train_sash_tk2, method="lvq", preProcess="scale", trControl=control)
+
+# estimate variable importance
+importance_sash_tk2 <- varImp(model, scale=FALSE)
+
+# plot importance
+plot(importance_sash_tk2)
+```
+
+In the combined data set, trimester 2 is still the same as trimester 1 that biochemical values had more contribution toward the prediction of Down Syndrome. However, fetus's age was from the second most important variable was dropped down to the second least important variable in the prediction models.
+
+### **Model performance of each machine learning model in each data set**
+
+```{r model name, echo=FALSE}
+Model <- c("k-nearest neighbor", "Support Vector Machine", "Random Forest", "XGBoost")
+```
+
+```{r model_perform_train_sa_tk1, echo=FALSE}
+model_perform_train_sa_tk1 <- rbind(knn_sa_tk1$results[which.max(knn_sa_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  svm_sa_tk1$results[which.max(svm_sa_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  rf_sa_tk1$results[which.max(rf_sa_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  xgb_sa_tk1$results[which.max(xgb_sa_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")])
+model_perform_train_sa_tk1 <- cbind(Model, model_perform_train_sa_tk1)
+row.names(model_perform_train_sa_tk1) <- NULL
+```
+
+```{r model_perform_train_sh_tk1, echo=FALSE}
+model_perform_train_sh_tk1 <- rbind(knn_sh_tk1$results[which.max(knn_sh_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  svm_sh_tk1$results[which.max(svm_sh_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  rf_sh_tk1$results[which.max(rf_sh_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  xgb_sh_tk1$results[which.max(xgb_sh_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")])
+model_perform_train_sh_tk1 <- cbind(Model, model_perform_train_sh_tk1)
+row.names(model_perform_train_sh_tk1) <- NULL
+```
+
+```{r model_perform_train_sash_tk1, echo=FALSE}
+model_perform_train_sash_tk1 <- rbind(knn_sash_tk1$results[which.max(knn_sash_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  svm_sash_tk1$results[which.max(svm_sash_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  rf_sash_tk1$results[which.max(rf_sash_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  xgb_sash_tk1$results[which.max(xgb_sash_tk1$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")])
+model_perform_train_sash_tk1 <- cbind(Model, model_perform_train_sash_tk1)
+row.names(model_perform_train_sash_tk1) <- NULL
+```
+
+```{r model_perform_train_sa_tk2, echo=FALSE}
+model_perform_train_sa_tk2 <- rbind(knn_sa_tk2$results[which.max(knn_sa_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  svm_sa_tk2$results[which.max(svm_sa_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  rf_sa_tk2$results[which.max(rf_sa_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  xgb_sa_tk2$results[which.max(xgb_sa_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")])
+model_perform_train_sa_tk2 <- cbind(Model, model_perform_train_sa_tk2)
+row.names(model_perform_train_sa_tk2) <- NULL
+```
+
+```{r model_perform_train_sh_tk2, echo=FALSE}
+model_perform_train_sh_tk2 <- rbind(knn_sh_tk2$results[which.max(knn_sh_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  svm_sh_tk2$results[which.max(svm_sh_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  rf_sh_tk2$results[which.max(rf_sh_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  xgb_sh_tk2$results[which.max(xgb_sh_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")])
+model_perform_train_sh_tk2 <- cbind(Model, model_perform_train_sh_tk2)
+row.names(model_perform_train_sh_tk2) <- NULL
+```
+
+```{r model_perform_train_sash_tk2, echo=FALSE}
+model_perform_train_sash_tk2 <- rbind(knn_sash_tk2$results[which.max(knn_sash_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  svm_sash_tk2$results[which.max(svm_sash_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  rf_sash_tk2$results[which.max(rf_sash_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")],
+                                  xgb_sash_tk2$results[which.max(xgb_sash_tk2$results$ROC), c("ROC", "Sens", "Spec", "Accuracy")])
+model_perform_train_sash_tk2 <- cbind(Model, model_perform_train_sash_tk2)
+row.names(model_perform_train_sash_tk2) <- NULL
+```
+
+#### **Trimester 1**
+
+```{r model_perform_train_tk1, echo=FALSE}
+model_perform_train_tk1 <- rbind(model_perform_train_sa_tk1,
+                           model_perform_train_sh_tk1,
+                           model_perform_train_sash_tk1)
+model_perform_train_tk1 %>%
+  kbl(align = "lcccc", caption = "\\label{tab:tk1-model-train}Models performance in training process on trimester 1 data", booktabs = TRUE, digits = 2) %>%
+  pack_rows("Ultrasound", 1, 4) %>%
+  pack_rows("Biochemical", 5, 8) %>%
+  pack_rows("Both ultrasound and biochemical", 9, 12) %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+Models performance in trimester 1 during training phase was shown in \ref{tab:tk1-model-train}. Highest sensitivity, specificity and accuracy achieved were 96%, 98% and 97%, respectively by RF model built with both ultrasound and biochemical data, followed by XGBoost model on the same data set, with the same specificity and accuracy but 1% sensitivity lower. In ultrasound dataset, RF and XGBoost got the same accuracy of 91% and in biochemical data set, XGBoost got 93% accuracy, 1% accuracy higher than RF model.
+
+#### **Trimester 2**
+
+```{r model_perform_train_tk2, echo=FALSE}
+model_perform_train_tk2 <- rbind(model_perform_train_sa_tk2,
+                           model_perform_train_sh_tk2,
+                           model_perform_train_sash_tk2)
+model_perform_train_tk2 %>%
+  kbl(align = "lcccc", caption = "\\label{tab:tk2-model-train}Models performance in training process on trimester 2 data", booktabs = TRUE, digits = 2) %>%
+  pack_rows("Ultrasound", 1, 4) %>%
+  pack_rows("Biochemical", 5, 8) %>%
+  pack_rows("Both ultrasound and biochemical", 9, 12) %>%
+  kable_styling(latex_options = "HOLD_position")
+```
+
+Both RF and XGBoost models built with ultrasound and biochemical data set were still the two best models in trimester 2 as shown in table \ref{tab:tk2-model-train}. The RF model reached 92% accuracy while XGBoost's accuracy got up to 91%. RF model built using ultrasound data set got the same accuracy of 91%. The next one is XGBoost model with 90% accuracy, 1% accuracy lower on the same ultrasound data set.
+
+## **Performance of each machine learning models on the test set**
+
+```{r model_perform_test_sa_tk1, echo=FALSE}
+model_perform_test_sa_tk1 <- rbind(coords_knn_sa_tk1,
+                                  coords_svm_sa_tk1,
+                                  coords_rf_sa_tk1,
+                                  coords_xgb_sa_tk1)
+model_perform_test_sa_tk1 <- cbind(Model, model_perform_test_sa_tk1)
+row.names(model_perform_test_sa_tk1) <- NULL
+```
+
+```{r model_perform_test_sh_tk1, echo=FALSE}
+model_perform_test_sh_tk1 <- rbind(coords_knn_sh_tk1,
+                                  coords_svm_sh_tk1,
+                                  coords_rf_sh_tk1,
+                                  coords_xgb_sh_tk1)
+model_perform_test_sh_tk1 <- cbind(Model, model_perform_test_sh_tk1)
+row.names(model_perform_test_sh_tk1) <- NULL
+```
+
+```{r model_perform_test_sash_tk1, echo=FALSE}
+model_perform_test_sash_tk1 <- rbind(coords_knn_sash_tk1,
+                                  coords_svm_sash_tk1,
+                                  coords_rf_sash_tk1,
+                                  coords_xgb_sash_tk1)
+model_perform_test_sash_tk1 <- cbind(Model, model_perform_test_sash_tk1)
+row.names(model_perform_test_sash_tk1) <- NULL
+```
+
+```{r model_perform_test_sa_tk2, echo=FALSE}
+model_perform_test_sa_tk2 <- rbind(coords_knn_sa_tk2,
+                                  coords_svm_sa_tk2,
+                                  coords_rf_sa_tk2,
+                                  coords_xgb_sa_tk2)
+model_perform_test_sa_tk2 <- cbind(Model, model_perform_test_sa_tk2)
+row.names(model_perform_test_sa_tk2) <- NULL
+```
+
+```{r model_perform_test_sh_tk2, echo=FALSE}
+model_perform_test_sh_tk2 <- rbind(coords_knn_sh_tk2,
+                                  coords_svm_sh_tk2,
+                                  coords_rf_sh_tk2,
+                                  coords_xgb_sh_tk2)
+model_perform_test_sh_tk2 <- cbind(Model, model_perform_test_sh_tk2)
+row.names(model_perform_test_sh_tk2) <- NULL
+```
+
+```{r model_perform_test_sash_tk2, echo=FALSE}
+model_perform_test_sash_tk2 <- rbind(coords_knn_sash_tk2,
+                                  coords_svm_sash_tk2,
+                                  coords_rf_sash_tk2,
+                                  coords_xgb_sash_tk2)
+model_perform_test_sash_tk2 <- cbind(Model, model_perform_test_sash_tk2)
+row.names(model_perform_test_sash_tk2) <- NULL
+```
+
+### **Trimester 1**
+
+```{r roc_tk1, fig.align='center', fig.height=7, fig.cap = "\\label{fig:tk1-roc}Compare models on trimester 1 testing data through ROC curve", echo=FALSE}
+roc_tk1 <- plot.roc(rp_knn_sa_tk1, col = "#FF0000")
+lines(rp_svm_sa_tk1, col = "#FF8000")
+lines(rp_rf_sa_tk1, col = "#FFFF00")
+lines(rp_xgb_sa_tk1, col = "#80FF00")
+lines(rp_knn_sh_tk1, col = "#00FF00")
+lines(rp_svm_sh_tk1, col = "#00FF80")
+lines(rp_rf_sh_tk1, col = "#00FFFF")
+lines(rp_xgb_sh_tk1, col = "#0080FF")
+lines(rp_knn_sash_tk1, col = "#0000FF")
+lines(rp_svm_sash_tk1, col = "#8000FF")
+lines(rp_rf_sash_tk1, col = "#FF00FF")
+lines(rp_xgb_sash_tk1, col = "#FF0080")
+
+legend("bottomright", legend = c("kNN ultrasound", "SVM ultrasound", "RF ultrasound", "XGB ultrasound", "kNN biochemical", "SVM biochemical", "RF biochemical", "XGB biochemical", "kNN both", "SVM both", "RF both", "XGB both"), col = c("#FF0000", "#FF8000", "#FFFF00", "#80FF00", "#00FF00", "#00FF80", "#00FFFF", "#0080FF", "#0000FF", "#8000FF", "#FF00FF", "#FF0080"),lwd = 2)
+```
+
+Figure \ref{fig:tk1-roc} showed ROC curve of all 12 trimester 1 machine learning models through each respective trimester 1 test set. kNN model built using ultrasound data set had the highest AUC in the test phase while RF model built with combined data set showed the lowest AUC.
+
+```{r model_perform_test_tk1, echo=FALSE}
+model_perform_test_tk1 <- rbind(model_perform_test_sa_tk1,
+                           model_perform_test_sh_tk1,
+                           model_perform_test_sash_tk1)
+model_perform_test_tk1 %>%
+  kbl(align = "lcccc", caption = "\\label{tab:tk1-model-test}Models performance in testing process on trimester 1 data", booktabs = TRUE, digits = 2) %>%
+  pack_rows("Ultrasound", 1, 4) %>%
+  pack_rows("Biochemical", 5, 8) %>%
+  pack_rows("Both ultrasound and biochemical", 9, 12) %>%
+  kable_styling(latex_options = c("HOLD_position", "scale_down"), position = "center")
+```
+
+Detail performance of each trimester 1 models during test phase was shown in table \ref{tab:tk1-model-test}. All machine learning models that built on data set contained biochemical values correctly classified the only case of Down Syndrome, the only model which did the same, accurately predicted all 18 Down Syndrome cases in the ultrasound test set was SVM model. SVM built on combined data set had the highest overall accuracy, succeeded by kNN model built on ultrasound data set, the model with the highest AUC as demonstrated in figure \ref{fig:tk1-roc}.
+
+### **Trimester 2**
+
+```{r roc_tk2, fig.align='center', fig.height=7, fig.cap = "Compare models on trimester 2 testing data through ROC curve", echo=FALSE}
+roc_tk2 <- plot.roc(rp_knn_sa_tk2, col = "#FF0000")
+lines(rp_svm_sa_tk2, col = "#FF8000")
+lines(rp_rf_sa_tk2, col = "#FFFF00")
+lines(rp_xgb_sa_tk2, col = "#80FF00")
+lines(rp_knn_sh_tk2, col = "#00FF00")
+lines(rp_svm_sh_tk2, col = "#00FF80")
+lines(rp_rf_sh_tk2, col = "#00FFFF")
+lines(rp_xgb_sh_tk2, col = "#0080FF")
+lines(rp_knn_sash_tk2, col = "#0000FF")
+lines(rp_svm_sash_tk2, col = "#8000FF")
+lines(rp_rf_sash_tk2, col = "#FF00FF")
+lines(rp_xgb_sash_tk2, col = "#FF0080")
+
+legend("bottomright", legend = c("kNN ultrasound", "SVM ultrasound", "RF ultrasound", "XGB ultrasound", "kNN biochemical", "SVM biochemical", "RF biochemical", "XGB biochemical", "kNN both", "SVM both", "RF both", "XGB both"), col = c("#FF0000", "#FF8000", "#FFFF00", "#80FF00", "#00FF00", "#00FF80", "#00FFFF", "#0080FF", "#0000FF", "#8000FF", "#FF00FF", "#FF0080"),lwd = 2)
+```
+
+In trimester 2, all 4 models built using combined data set achieved highest AUC on individual test set, kNN and SVM models had better AUC than RF and XGBoost. Models made by biochemical data performed better than those made by ultrasound data.
+
+```{r model_perform_test_tk2, echo=FALSE}
+model_perform_test_tk2 <- rbind(model_perform_test_sa_tk2,
+                           model_perform_test_sh_tk2,
+                           model_perform_test_sash_tk2)
+model_perform_test_tk2 %>%
+  kbl(align = "lcccc", caption = "\\label{table:tk2-model-test}Models performance in testing process on trimester 2 data", booktabs = TRUE, digits = 2) %>%
+  pack_rows("Ultrasound", 1, 4) %>%
+  pack_rows("Biochemical", 5, 8) %>%
+  pack_rows("Both ultrasound and biochemical", 9, 12) %>%
+  kable_styling(latex_options = c("HOLD_position", "scale_down"), position = "center")
+```
+
+Table \ref{table:tk2-model-test} demonstrated detail parameters of all models during testing phase. All models made by combined data set properly detected all 3 cases of Down Syndrome. SVM got the highest AUC and accuracy by also accurately classified 216/218 negative cases of Down Syndrome.
+
+```{r}
+
+```
+
+# **Chapter 4: Discussion**
+In this study, we wanted to build and find the best and most suitable machine learning model for each type of situations in practice. There would be medical facilities in low level health care system that can only do the ultrasound test, only the biochemical test or both of the test. By making models for every type of situations, we can expand the scope of this screening program and let more pregnant women be screened for Down Syndrome, thus lowering the prevalence of Down Syndrome cases in the community. Machine learning models was a cheap yet effective and could be applied in low level health care setting where didn't have medical expert in prenatal screening.
+
+## Data sets characteristics
+
+We chose to build models according to 3 sets of ultrasound, biochemistry and combined data based on the fact that ultrasound is one of the most popular testing methods in medical facilities and biochemical testing is the most frequently used method of prenatal screening. 
+
+### Included variables
+
+In the ultrasound data set, the selection of an index as the input variable for the machine learning model was based on the number of missing that the variable had. The selected variables are the ones with the least number of missing in the ultrasound indexes. Variables that had more missing show little value in prenatal screening in practice. With what variables a machine learning model is built, it needs to have those variables as input when put into practice to be able to produce results. The fact that there are many missing values in the data set to build the models also partly reflects this situation in reality. So even if these variables are added to the machine learning model, it will be difficult to apply them in practice.
+
+With the biochemical data set, the 3 input variables in each trimester are routine indices in the double test and triple test for trimester 1 and trimester 2 respectively. Due to the fact that one health care facility could have many different types of testing machines with different scales and standards, not to mention that if these machine learning models were applied in practice with different medical facilities, the diversity could also be multiplied many times over. To solve this problem, we need to have a unit common to all analyzers, which is the multiple of median (MoM). A multiple of the median (MoM) is a measure of how far an individual test result deviates from the median .
+
+An MoM for a test result for a patient can be determined by the following:
+
+```{=tex}
+\begin{center}
+$MoM(Patient) = \frac{Result(Patient)}{Median(PatientPopulation)}$
+\end{center}
+```
+
+### Training and testing data sets
+In order to be included in the 6 sub-data sets, each case must have values of all the required variables, which means the combined data set must have less observations than ultrasound or biochemical data sets.
+
+The training data set was used to build machine learning models. The k cross validation method means that the training data sets were divided into k equal parts, of which k-1 parts were used to build the model and 1 part was used for testing. In this topic, we used 10 cross validation method, that is, 9/10 parts were used to build models. The performance in training process showed in the results section were the results of testing built models on 1/10 the number of observations of these training data sets. The process of testing using a part the training data set is also known as validation and this partial data set is called the validation set. This validation process is performed to evaluate machine learning models during training to refine the models before they are applied in practice.
+
+```{=tex}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.5\textwidth, height=0.5\textheight]{cup.jpg}
+\caption{Different type of cups}
+\label{fig:cup}
+\end{figure}
+```
+
+The test set, on the other hand, contained observations that were not used in the training process. It was a completely new, unseen data sets that was collected from another hospital. In this cases, test data was collected from 3 different hospitals which were Hanoi Medical University hospital, Hanoi Obstetrics and Gynecology Hospital and the National Hospital of Obstetrics and Gynecology. The purpose of test set was to see how well our models fit with real life unseen data.
+
+There are 10 type of cups in figure \ref{fig:cup} [@islam_partial_2018]. This figure shows the diversity of features in different type of cups. Although they are all called cups, they differ in length, body width, bottom width, color, handle size, etc. We can take for example the picture of cups from (a) to (g) as the training data set and (h) to (j) as the test data set since the cups from (h) to ( j) has characteristics that are different from cups (a) through (g). This test is intended to evaluate on test data how well machine learning models generalize a definition of a cup from the training data.
+
+In our data sets, here's 1 case of Down Syndrome in trimester 1 biochemical and combined test set, 5 cases in trimester 2 biochemical test set and 3 in trimester 2 combined test set which may not be sufficient amount of positive cases in some extends. However, the ability of machine learning models can also be measure by specificity which is the ability to correctly classify all of the negative cases beside sensitivity which is the ability to correctly classify all of the positive cases as well.
+
+### Characteristics of participants
+
+## Feature importance
+### Trimester 1
+Nuchal translucency was the most important variable in predicting Down Syndrome in all data sets containing this variable in trimester 1. This result was relevant with current literature as the importance of predicting Down syndrome using nuchal translucency had been demonstrated in various studies. Anna Locatelli in 2000 concluded that the use of the difference between observed and expected nuchal fold thicknesses to determine likelihood ratios allows the calculation of individual posterior probabilities of Down syndrome [@locatelli_critical_2000]. In 1995, Dr B.Brambati confirmed the potential application of the measurement of nuchal translucency thickness for fetal aneuploidy screening before the end of the first trimester. Measurement of nuchal translucency in predicting trisomies was now a routine procedure in predicting Down Syndrome [@carlson_prenatal_2017].
+
+Our findings indicated that the mother's age and history of having Down Syndrome were not as significant as other ultrasound variables in predicting Down Syndrome, while current literature supports the idea that women over 35 years old are at a higher risk of having a pregnancy affected by Down Syndrome. This can be explained by the fact that the results of these ultrasound and biochemical tests are directly influenced by the fetal Down Syndrome condition. When compared to these factors, an indirectly influenced factor like the mother's age would likely have limited ability to predict the Down Syndrome condition equivalently. This finding was support by another study that measure feature importance on mother's age and 6 others biochemical values which produced similar result [@he_machine_2021-1].
+
+### Trimester 2
+In trimester 2, femur length was the most important variables in the ultrasound data set. This finding was also proven by previous literature. Femur length together had been shown to be two important indicators in predicting Down in the second trimester [@benacerraf_sonographic_1987; @nyberg_humerus_1993; @benacerraf_role_2005; @lockwood_sonographic_1987]. Biparietal diameter was also an essential index as biparietal diameter/femur length ratio was found to decrease with gestational age in the normal population and was consistently elevated in the Down syndrome population throughout the second trimester.
+
+In a study conducted by Kevin Spencer in 2005 to assess the impact and value of AFP and hCG levels in screening for trisomy 21 and trisomy 18 among 67,904 pregnant women, the author concluded that the hCG index can achieve high detection rates over an extended period of time [@spencer_second_1999]. In another study by Vivienne L. Souter in 2002 involving 72 pregnant women with Down Syndrome, the triple test indices were combined with ultrasound to explore the correlation when combining these two sets of indices in screening [@souter_correlation_2002]. The results demonstrated that the hCG index, when combined with nuchal translucency measurement, showed the highest correlation. These studies align with our findings in assessing the importance of hCG in the trimester 2 biochemical data set.
+
+In both trimester, both combined data set, biochemical variables were shown to have higher impact on the prediction of Down rather than ultrasound indices. This explains the specific use of these biochemical indices in screening for trisomies in the current universal screening program.
+
+## Training phase
+In both trimester and in all 6 data sets, RF and XGBoost models achieved highest AUC and accuracy, followed by kNN and SVM. RF was better than XGBoost in all 3 data sets in the second trimester, but worse in trimester 1 biochemical data set.
+
+# **References**

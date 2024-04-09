@@ -1,0 +1,13 @@
+name: AI_Down_Screen
+title: AI_Down_Screen
+username: waltjer
+account: waltjer
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 10864400
+bundleId: 8105380
+url: https://waltjer.shinyapps.io/AI_Down_Screen/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: background.jpg
